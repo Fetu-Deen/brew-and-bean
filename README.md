@@ -149,9 +149,15 @@ git push -u origin feature/your-task
 
 ---
 
-## The Board (Trello or GitHub Projects)
+## The Board (GitHub Projects)
 
-Columns: **Backlog → Blocked (waiting on a dependency) → In Progress → In Review (PR open) → Done**
+We use **GitHub Projects** — not Trello — because it lives next to the repo: cards become issues and link to branches and PRs, and can move automatically as work progresses. **One board, not two**, or tasks drift out of sync.
+
+**Set it up:** Repo → **Projects** tab → **New project** → **Board** template.
+
+**Columns:** **Backlog → Blocked (waiting on a dependency) → In Progress → In Review (PR open) → Done**
+
+**Automate it (optional, worth it):** in the Project's **Workflows**, enable the built-in rules so the board tracks real activity without manual dragging — e.g. *item added → Backlog*, *PR opened → In Review*, *PR merged → Done*.
 
 Use **Blocked** honestly — a card there should say *what* it's waiting on, e.g. "Waiting on: SNS topic ARN." That's how we make "we'll wait for each other at the right moments" visible instead of silent.
 
