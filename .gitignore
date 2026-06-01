@@ -1,0 +1,23 @@
+# secrets — NEVER commit
+.env
+.env.*
+*.pem
+*.key
+credentials
+aws-exports.js
+
+# dependencies / build
+node_modules/
+dist/
+build/
+.vite/
+
+# OS / editor
+.DS_Store
+.vscode/
+*.log
+
+# terraform (if you add any)
+*.tfstate
+*.tfstate.*
+.terraform/

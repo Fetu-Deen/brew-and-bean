@@ -1,0 +1,18 @@
+{
+  "Records": [
+    {
+      "messageId": "test-message-0001",
+      "receiptHandle": "test-receipt-handle",
+      "body": "{\"Type\":\"Notification\",\"MessageId\":\"abc-123-def-456\",\"TopicArn\":\"arn:aws:sns:us-west-2:269742496681:coffee-shop-orders\",\"Subject\":\"New coffee order: Latte\",\"Message\":\"{\\\"orderId\\\":\\\"550e8400-e29b-41d4-a716-446655440000\\\",\\\"customer\\\":\\\"Test Tester\\\",\\\"item\\\":\\\"Latte\\\",\\\"size\\\":\\\"M\\\",\\\"timestamp\\\":\\\"2026-06-01T15:04:05Z\\\"}\",\"Timestamp\":\"2026-06-01T15:04:05.000Z\"}",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1717254245000"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "0000000000000000000000000000test",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-west-2:269742496681:coffee-process-queue",
+      "awsRegion": "us-west-2"
+    }
+  ]
+}
