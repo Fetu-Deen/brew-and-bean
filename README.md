@@ -161,6 +161,8 @@ We use **GitHub Projects** — not Trello — because it lives next to the repo:
 
 Use **Blocked** honestly — a card there should say *what* it's waiting on, e.g. "Waiting on: SNS topic ARN." That's how we make "we'll wait for each other at the right moments" visible instead of silent.
 
+**Full setup + the ready-to-paste cards:** see [docs/board-setup.md](docs/board-setup.md) — it explains the board (our Trello equivalent), the columns, the automations, and has one starter card per task.
+
 ---
 
 ## Free Tier survival (we do NOT want a surprise bill)
