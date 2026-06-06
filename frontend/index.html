@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>☕ Coffee Order Demo</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    max-width: 480px;
+    margin: 60px auto;
+    padding: 24px;
+    background: #f5f1eb;
+    color: #2c1810;
+  }
+  h1 { margin-top: 0; }
+  .subtitle { color: #8b6f47; margin-bottom: 32px; }
+  label { display: block; margin: 16px 0 6px; font-weight: 600; }
+  input, select {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #c4a57b;
+    border-radius: 6px;
+    background: white;
+    box-sizing: border-box;
+  }
+  button {
+    margin-top: 24px;
+    width: 100%;
+    padding: 14px;
+    font-size: 16px;
+    font-weight: 600;
+    background: #6f4e37;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  button:hover { background: #5a3f2c; }
+  button:disabled { background: #b5a690; cursor: not-allowed; }
+  #status {
+    margin-top: 24px;
+    padding: 14px;
+    border-radius: 6px;
+    display: none;
+  }
+  .success { background: #d4edda; color: #155724; display: block !important; }
+  .error { background: #f8d7da; color: #721c24; display: block !important; }
+  #recommendation {
+    margin-top: 12px;
+    padding: 14px;
+    border-radius: 6px;
+    background: #fff8e1;
+    border-left: 4px solid #f59e0b;
+    color: #78350f;
+    font-size: 14px;
+    display: none;
+  }
+  #recommendation strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #b45309;
+  }
+  .architecture {
+    margin-top: 40px;
+    padding: 16px;
+    background: white;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #555;
+    border-left: 4px solid #6f4e37;
+  }
+  code { background: #eee; padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+  <h1>☕ Brew & Bean</h1>
+  <p class="subtitle">Place a coffee order — watch it fan out across AWS.</p>
+
+  <label for="customer">Your name</label>
+  <input id="customer" type="text" placeholder="e.g. Fatu" />
+
+  <label for="item">Drink</label>
+  <select id="item">
+    <option value="latte">Latte</option>
+    <option value="cappuccino">Cappuccino</option>
+    <option value="espresso">Espresso</option>
+    <option value="mocha">Mocha</option>
+    <option value="americano">Americano</option>
+  </select>
+
+  <label for="size">Size</label>
+  <select id="size">
+    <option value="small">Small</option>
+    <option value="medium" selected>Medium</option>
+    <option value="large">Large</option>
+  </select>
+
+  <button id="submit">Place Order</button>
+
+  <div id="status"></div>
+  <div id="recommendation">
+    <strong>☕ Claude recommends for your next visit</strong>
+    <span id="recommendation-text"></span>
+  </div>
+
+<script>
+// Use the team's us-west-2 (Oregon) ALB DNS:
+const FUNCTION_URL = "http://brew-and-bean-alb-250630978.us-west-2.elb.amazonaws.com";
+// old us-east-1 ALB: http://brew-and-bean-alb-1545459732.us-east-1.elb.amazonaws.com
+// const FUNCTION_URL = "http://localhost:3000"; //local testing
+
+const btn = document.getElementById("submit");
+const statusEl = document.getElementById("status");
+
+btn.addEventListener("click", async () => {
+  const customer = document.getElementById("customer").value.trim();
+  const item = document.getElementById("item").value;
+  const size = document.getElementById("size").value;
+
+  if (!customer) {
+    showStatus("Please enter your name.", "error");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Placing order...";
+  statusEl.style.display = "none";
+  document.getElementById("recommendation").style.display = "none";
+
+  try {
+    const res = await fetch(FUNCTION_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customer, item, size }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      showStatus(`✅ ${data.status}`, "success");
+      // Bedrock now runs asynchronously (Path D) — poll until the recommendation lands.
+      pollRecommendation(customer);
+    } else {
+      showStatus(`❌ Error: ${data.error || "Unknown error"}`, "error");
+    }
+  } catch (err) {
+    showStatus(`❌ Network error: ${err.message}`, "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Place Order";
+  }
+});
+
+function showStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = type;
+}
+
+// Bedrock runs asynchronously (Path D): a Lambda calls Bedrock and writes the
+// recommendation to DynamoDB keyed by customer name. We poll /recommendation
+// every 2s until it's ready (or give up after ~30s).
+async function pollRecommendation(customer) {
+  const recEl  = document.getElementById("recommendation");
+  const textEl = document.getElementById("recommendation-text");
+  textEl.textContent = "Brewing a recommendation…";
+  recEl.style.display = "block";
+
+  for (let attempt = 0; attempt < 15; attempt++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const res  = await fetch(`${FUNCTION_URL}/recommendation?customer=${encodeURIComponent(customer)}`);
+      const data = await res.json();
+      if (data.ready && data.recommendation) {
+        textEl.textContent = data.recommendation;
+        return;
+      }
+    } catch (_) { /* network blip — keep polling */ }
+  }
+  textEl.textContent = "Your recommendation is taking longer than usual — check back soon.";
+}
+</script>
+</body>
+</html>
