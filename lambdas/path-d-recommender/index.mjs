@@ -9,7 +9,7 @@ import { DynamoDBDocumentClient, QueryCommand, PutCommand } from "@aws-sdk/lib-d
 import { BedrockRuntimeClient, InvokeModelCommand } from "@aws-sdk/client-bedrock-runtime";
 
 const ddb     = DynamoDBDocumentClient.from(new DynamoDBClient({ region: "us-west-2" }));
-const bedrock = new BedrockRuntimeClient({ region: "us-west-2" });
+const bedrock = new BedrockRuntimeClient({ region: "us-east-1" });
 const MODEL_ID    = "us.anthropic.claude-sonnet-4-6";
 const ORDERS      = "coffee-orders";
 const RECO_TABLE  = "coffee-recommendations";
