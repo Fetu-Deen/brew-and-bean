@@ -365,6 +365,7 @@ Place one order from the deployed page and verify **all** of these:
 | **CloudFormation / CodePipeline** | *post-project* | — | Infrastructure-as-code + CI/CD. Out of scope for these two weeks; planned as self-study after our bootcamp. |
 
 Some additional features to be added on:
+
 -->DLQ (Dead-Letter Queue) — A backup queue that catches messages our Lambdas fail to process. SQS retries a failed message a few times; if it still won't process (bad data, a bug, Bedrock down), it lands in the DLQ instead of looping forever or vanishing. Why we need it: so a failed Bedrock recommendation doesn't silently drop the message — we keep it, inspect it, and replay it once fixed. It's our safety net for the async paths.
 
 -->X-Ray — Distributed tracing. It tags each request and follows it across every hop (API → Fargate → SNS → SQS → Lambdas → DynamoDB/Bedrock), giving us a service map and a per-request timeline. Why we need it: when something is slow or broken, it shows us which hop, instead of us hand-stitching five CloudWatch log groups by timestamp. It's the difference between "something's wrong" and "the Bedrock call is taking 4 seconds."
