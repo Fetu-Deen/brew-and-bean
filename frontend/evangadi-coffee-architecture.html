@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evangadi Coffee Shop — Event-Driven Architecture on AWS</title>
+<style>
+  :root{
+    --espresso:#4a3225; --coffee:#6f4e37; --cream:#f5f1eb; --paper:#fffdf9;
+    --amber:#f59e0b; --blue:#2563eb; --green:#16a34a; --ink:#2b1d14;
+    --muted:#8a7766;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:var(--cream);
+    font-family:'Avenir Next','Segoe UI','Helvetica Neue',Arial,sans-serif;
+    color:var(--ink);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  header{
+    background:linear-gradient(90deg,var(--espresso),var(--coffee));
+    color:var(--cream);
+    display:flex; align-items:center; gap:18px;
+    padding:14px 28px; flex:0 0 auto;
+  }
+  header .cup{font-size:26px;}
+  header h1{font-size:21px; font-weight:700; letter-spacing:.3px;}
+  header .sub{font-size:12.5px; opacity:.85; margin-top:2px; letter-spacing:.4px;}
+  header .spacer{flex:1;}
+  button{
+    font-family:inherit; font-size:14.5px; font-weight:700;
+    border:none; border-radius:999px; padding:10px 22px; cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease, opacity .12s;
+  }
+  button:active{transform:scale(.97);}
+  #playBtn{background:var(--amber); color:#3b2a12; box-shadow:0 3px 10px rgba(0,0,0,.25);}
+  #playBtn:hover{box-shadow:0 5px 16px rgba(0,0,0,.3);}
+  #resetBtn{background:rgba(255,255,255,.14); color:var(--cream); margin-left:10px;}
+  #resetBtn:hover{background:rgba(255,255,255,.24);}
+  button:disabled{opacity:.45; cursor:default;}
+  main{flex:1; display:flex; align-items:center; justify-content:center; padding:10px 14px; min-height:0;}
+  svg{width:100%; height:100%; display:block;}
+
+  /* ---- SVG styling ---- */
+  text{font-family:'Avenir Next','Segoe UI','Helvetica Neue',Arial,sans-serif;}
+  .tile{fill:var(--paper); stroke:#e4dccf; stroke-width:1.5; rx:16;
+        filter:drop-shadow(0 3px 6px rgba(74,50,37,.10));}
+  .tile-name{font-size:19px; font-weight:700; fill:var(--ink);}
+  .tile-res{font-size:14px; fill:var(--muted); font-weight:600;}
+  .tile-note{font-size:12.5px; fill:var(--muted);}
+  .icon{font-size:30px;}
+  .boundary{fill:rgba(111,78,55,.045); stroke:var(--coffee); stroke-width:2.5; rx:20;}
+  .az{fill:rgba(245,158,11,.05); stroke:#d9b98c; stroke-width:1.6; stroke-dasharray:7 5; rx:14;}
+  .bound-label{font-size:17px; font-weight:800; fill:var(--coffee); letter-spacing:.4px;}
+  .az-label{font-size:14px; font-weight:800; fill:#a07a3c;}
+  .az-sub{font-size:12.5px; fill:#a07a3c;}
+  .flow{fill:none; stroke:#b9a68f; stroke-width:2.6; marker-end:url(#arr);}
+  .flow-dash{fill:none; stroke:#b9a68f; stroke-width:2.4; stroke-dasharray:8 6; marker-end:url(#arr);}
+  .flow-label{font-size:13px; font-weight:700; fill:#7a6450;}
+  .headline{font-size:22px; font-weight:800; fill:var(--espresso); font-style:italic;}
+  .lane-title{font-size:15.5px; font-weight:800; letter-spacing:.5px;}
+  .badge{fill:#fff; stroke:#e0d6c6; stroke-width:1.2; rx:999;}
+  .badge-text{font-size:12.5px; font-weight:600; fill:#6e5a47;}
+  .legend-title{font-size:13px; font-weight:800; fill:var(--muted); letter-spacing:1.2px;}
+
+  /* lane accents */
+  .laneA{stroke:var(--coffee);} .accA{fill:var(--coffee);}
+  .laneB{stroke:var(--blue);}   .accB{fill:var(--blue);}
+  .laneC{stroke:var(--green);}  .accC{fill:var(--green);}
+  .laneD{stroke:var(--amber);}  .accD{fill:var(--amber);}
+  .lane-flow{fill:none; stroke-width:2.8; opacity:.85;}
+
+  /* animation states */
+  .lit-A rect{stroke:var(--coffee); stroke-width:3; filter:drop-shadow(0 0 12px rgba(111,78,55,.65));}
+  .lit-B rect{stroke:var(--blue);   stroke-width:3; filter:drop-shadow(0 0 12px rgba(37,99,235,.6));}
+  .lit-C rect{stroke:var(--green);  stroke-width:3; filter:drop-shadow(0 0 12px rgba(22,163,74,.6));}
+  .lit-D rect{stroke:var(--amber);  stroke-width:3; filter:drop-shadow(0 0 12px rgba(245,158,11,.7));}
+  .lit-A rect,.lit-B rect,.lit-C rect,.lit-D rect{transition:all .35s ease;}
+  .tile-g rect{transition:all .35s ease;}
+  .flash{font-size:15px; font-weight:800; opacity:0; transition:opacity .25s ease;}
+  .flash.on{opacity:1;}
+  #caption{font-size:24px; font-weight:800; fill:var(--espresso); font-style:italic;
+           opacity:0; transition:opacity .9s ease;}
+  #caption.on{opacity:1;}
+  .pulse-core{fill:#fff;}
+  .pulse-glow{fill:var(--amber); opacity:.45;}
+  @media (prefers-reduced-motion: reduce){
+    .lit-A rect,.lit-B rect,.lit-C rect,.lit-D rect,.tile-g rect,.flash,#caption{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="cup">☕</span>
+  <div>
+    <h1>Evangadi Coffee Shop — Event-Driven Architecture on AWS</h1>
+    <div class="sub">Team Brew &amp; Bean · Capstone Demo Defense · us-west-2</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="playBtn">▶&nbsp; Play flow</button>
+  <button id="resetBtn">Reset</button>
+</header>
+
+<main>
+<svg viewBox="0 0 2300 1010" xmlns="http://www.w3.org/2000/svg" aria-label="Architecture diagram">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#b9a68f"/>
+    </marker>
+    <marker id="arrA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6f4e37"/></marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="arrC" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/></marker>
+    <marker id="arrD" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#f59e0b"/></marker>
+  </defs>
+
+  <!-- ======================= FLOW LINES (under tiles) ======================= -->
+  <path id="p1" class="flow" d="M 240 375 L 296 375"/>
+  <path id="p2" class="flow" d="M 500 375 L 581 375"/>
+  <path id="p3" class="flow" d="M 705 375 L 756 375"/>
+  <path id="p4" class="flow" d="M 945 435 L 945 556"/>
+  <path id="p5" class="flow" d="M 1130 640 C 1195 640 1185 520 1236 508"/>
+  <path id="pECR" class="flow-dash" d="M 945 898 L 945 724"/>
+
+  <!-- lane connectors -->
+  <path id="pA" class="lane-flow laneA" marker-end="url(#arrA)" d="M 1440 470 C 1475 430 1460 210 1496 210"/>
+  <path id="pB" class="lane-flow laneB" marker-end="url(#arrB)" d="M 1440 490 C 1475 470 1462 410 1496 410"/>
+  <path id="pC" class="lane-flow laneC" marker-end="url(#arrC)" d="M 1440 520 C 1475 540 1462 610 1496 610"/>
+  <path id="pD" class="lane-flow laneD" marker-end="url(#arrD)" d="M 1440 540 C 1475 580 1460 810 1496 810"/>
+
+  <path class="lane-flow laneA" marker-end="url(#arrA)" d="M 1660 210 L 1706 210"/>
+  <path class="lane-flow laneA" marker-end="url(#arrA)" d="M 1870 210 L 1916 210"/>
+  <path class="lane-flow laneB" marker-end="url(#arrB)" d="M 1660 410 L 1706 410"/>
+  <path class="lane-flow laneB" marker-end="url(#arrB)" d="M 1870 410 L 1916 410"/>
+  <path class="lane-flow laneC" marker-end="url(#arrC)" d="M 1660 610 L 1706 610"/>
+  <path class="lane-flow laneC" marker-end="url(#arrC)" d="M 1870 610 L 1916 610"/>
+  <path class="lane-flow laneC" marker-end="url(#arrC)" d="M 2024 610 L 2036 610"/>
+  <path class="lane-flow laneC" marker-end="url(#arrC)" d="M 2144 610 L 2156 610"/>
+  <path class="lane-flow laneD" marker-end="url(#arrD)" d="M 1660 810 L 1706 810"/>
+  <path class="lane-flow laneD" marker-end="url(#arrD)" d="M 1870 810 L 1916 810"/>
+  <path class="lane-flow laneD" marker-end="url(#arrD)" d="M 2054 810 L 2066 810"/>
+
+  <!-- hidden animation guide paths (full lane runs) -->
+  <path id="gA" d="M 1440 470 C 1475 430 1460 210 1496 210 L 1580 210 L 1790 210 L 2070 210" fill="none" stroke="none"/>
+  <path id="gB" d="M 1440 490 C 1475 470 1462 410 1496 410 L 1580 410 L 1790 410 L 2070 410" fill="none" stroke="none"/>
+  <path id="gC" d="M 1440 520 C 1475 540 1462 610 1496 610 L 1580 610 L 1790 610 L 1970 610 L 2090 610 L 2210 610" fill="none" stroke="none"/>
+  <path id="gD" d="M 1440 540 C 1475 580 1460 810 1496 810 L 1580 810 L 1790 810 L 1985 810 L 2170 810" fill="none" stroke="none"/>
+
+  <!-- flow labels -->
+  <text class="flow-label" x="990" y="505">:3000 — only from bb-alb-sg</text>
+  <text class="flow-label" x="960" y="822">pulls image</text>
+  <text class="flow-label" x="1136" y="572">publishes the order</text>
+
+  <!-- ======================= CLIENT ======================= -->
+  <g class="tile-g" id="tBrowser">
+    <rect class="tile" x="40" y="290" width="200" height="170" rx="16"/>
+    <text class="icon" x="140" y="340" text-anchor="middle">🧑‍💻</text>
+    <text class="tile-name" x="140" y="378" text-anchor="middle">Customer Browser</text>
+    <text class="tile-res" x="140" y="402" text-anchor="middle">"Evangadi Coffee Shop"</text>
+    <text class="tile-note" x="140" y="428" text-anchor="middle">places an order</text>
+  </g>
+
+  <!-- ======================= WAF ======================= -->
+  <g class="tile-g" id="tWAF">
+    <rect class="tile" x="300" y="265" width="200" height="220" rx="16"/>
+    <text class="icon" x="400" y="308" text-anchor="middle">🛡️</text>
+    <text class="tile-name" x="400" y="344" text-anchor="middle">AWS WAF</text>
+    <text class="tile-res" x="400" y="366" text-anchor="middle">bb-waf-acl</text>
+    <text class="tile-note" x="400" y="392" text-anchor="middle">Core rule set</text>
+    <text class="tile-note" x="400" y="412" text-anchor="middle">Known bad inputs</text>
+    <text class="tile-note" x="400" y="432" text-anchor="middle">Amazon IP reputation</text>
+    <text class="tile-note" x="400" y="452" text-anchor="middle">Rate-limit</text>
+    <text id="wafFlash" class="flash accC" x="400" y="252" text-anchor="middle">inspected ✓</text>
+  </g>
+
+  <!-- ======================= VPC ======================= -->
+  <rect class="boundary" x="560" y="120" width="620" height="760" rx="20"/>
+  <text class="bound-label" x="582" y="155">Custom VPC · bb-vpc · 10.0.0.0/16 · us-west-2</text>
+
+  <!-- IGW -->
+  <g class="tile-g" id="tIGW">
+    <rect class="tile" x="585" y="312" width="120" height="126" rx="16"/>
+    <text class="icon" x="645" y="358" text-anchor="middle">🌐</text>
+    <text class="tile-name" x="645" y="394" text-anchor="middle" font-size="17">IGW</text>
+    <text class="tile-res" x="645" y="416" text-anchor="middle">bb-igw</text>
+  </g>
+  <text class="tile-note" x="645" y="466" text-anchor="middle">bb-rt-public:</text>
+  <text class="tile-note" x="645" y="484" text-anchor="middle">0.0.0.0/0 → bb-igw</text>
+
+  <!-- AZ boxes -->
+  <rect class="az" x="725" y="230" width="215" height="615"/>
+  <text class="az-label" x="745" y="262">us-west-2a</text>
+  <text class="az-sub" x="745" y="284">bb-public-1a · 10.0.1.0/24</text>
+  <rect class="az" x="950" y="230" width="215" height="615"/>
+  <text class="az-label" x="970" y="262">us-west-2b</text>
+  <text class="az-sub" x="970" y="284">bb-public-1b · 10.0.2.0/24</text>
+
+  <!-- ALB spanning both subnets -->
+  <g class="tile-g" id="tALB">
+    <rect class="tile" x="760" y="312" width="370" height="126" rx="16"/>
+    <text class="icon" x="810" y="388" text-anchor="middle">⚖️</text>
+    <text class="tile-name" x="855" y="360">Application Load Balancer</text>
+    <text class="tile-res" x="855" y="385">brew-and-bean-alb · listener :80</text>
+    <text class="tile-note" x="855" y="410">sg bb-alb-sg — allows :80 from internet</text>
+  </g>
+
+  <!-- ECS Fargate spanning both subnets -->
+  <g class="tile-g" id="tECS">
+    <rect class="tile" x="760" y="560" width="370" height="160" rx="16"/>
+    <text class="icon" x="812" y="640" text-anchor="middle">📦</text>
+    <text class="tile-name" x="858" y="612">ECS Fargate service</text>
+    <text class="tile-res" x="858" y="638">coffee-api · server.mjs · :3000</text>
+    <text class="tile-note" x="858" y="663">sg bb-ecs-sg</text>
+    <text class="tile-note" x="858" y="694">public IP enabled · egress via IGW · no NAT</text>
+  </g>
+
+  <!-- ======================= ECR (outside VPC) ======================= -->
+  <g class="tile-g" id="tECR">
+    <rect class="tile" x="760" y="902" width="370" height="96" rx="16"/>
+    <text class="icon" x="808" y="958" text-anchor="middle">🐳</text>
+    <text class="tile-name" x="850" y="942">Amazon ECR</text>
+    <text class="tile-res" x="850" y="968">brew-and-bean-coffee-api:latest · linux/amd64</text>
+  </g>
+
+  <!-- ======================= SNS HUB ======================= -->
+  <g class="tile-g" id="tSNS">
+    <rect class="tile" x="1240" y="415" width="200" height="180" rx="16"/>
+    <text class="icon" x="1340" y="466" text-anchor="middle">📣</text>
+    <text class="tile-name" x="1340" y="502" text-anchor="middle">Amazon SNS</text>
+    <text class="tile-res" x="1340" y="526" text-anchor="middle">coffee-shop-orders</text>
+    <text class="tile-note" x="1340" y="554" text-anchor="middle">{orderId, customer, item,</text>
+    <text class="tile-note" x="1340" y="572" text-anchor="middle">size, timestamp}</text>
+    <text id="snsFlash" class="flash accD" x="1340" y="402" text-anchor="middle">published ✓</text>
+  </g>
+
+  <!-- ======================= HEADLINE ======================= -->
+  <text class="headline" x="1880" y="58" text-anchor="middle">"One order event → four independent reactions.</text>
+  <text class="headline" x="1880" y="90" text-anchor="middle">None of them knows the others exist."</text>
+
+  <!-- ======================= PATH A — PERSISTENCE ======================= -->
+  <text class="lane-title accA" x="1500" y="128">🟫 PATH A — PERSISTENCE</text>
+  <g class="tile-g" id="tSqsA">
+    <rect class="tile" x="1500" y="155" width="160" height="110" rx="14"/>
+    <text class="icon" x="1580" y="196" text-anchor="middle" font-size="24">📨</text>
+    <text class="tile-name" x="1580" y="224" text-anchor="middle" font-size="16">SQS</text>
+    <text class="tile-res" x="1580" y="246" text-anchor="middle" font-size="12.5">coffee-process-queue</text>
+  </g>
+  <g class="tile-g" id="tLamA">
+    <rect class="tile" x="1710" y="155" width="160" height="110" rx="14"/>
+    <text class="icon" x="1790" y="196" text-anchor="middle" font-size="24">λ</text>
+    <text class="tile-name" x="1790" y="224" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="tile-res" x="1790" y="246" text-anchor="middle" font-size="12.5">coffee-processor</text>
+  </g>
+  <g class="tile-g" id="tDestA">
+    <rect class="tile" x="1920" y="155" width="300" height="110" rx="14"/>
+    <text class="icon" x="1975" y="218" text-anchor="middle" font-size="26">🗄️</text>
+    <text class="tile-name" x="2010" y="206" font-size="17">DynamoDB</text>
+    <text class="tile-res" x="2010" y="230" font-size="13.5">coffee-orders</text>
+  </g>
+
+  <!-- ======================= PATH B — MONITORING ======================= -->
+  <text class="lane-title accB" x="1500" y="328">🟦 PATH B — MONITORING</text>
+  <g class="tile-g" id="tSqsB">
+    <rect class="tile" x="1500" y="355" width="160" height="110" rx="14"/>
+    <text class="icon" x="1580" y="396" text-anchor="middle" font-size="24">📨</text>
+    <text class="tile-name" x="1580" y="424" text-anchor="middle" font-size="16">SQS</text>
+    <text class="tile-res" x="1580" y="446" text-anchor="middle" font-size="12">coffee-analytics-queue</text>
+  </g>
+  <g class="tile-g" id="tLamB">
+    <rect class="tile" x="1710" y="355" width="160" height="110" rx="14"/>
+    <text class="icon" x="1790" y="396" text-anchor="middle" font-size="24">λ</text>
+    <text class="tile-name" x="1790" y="424" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="tile-res" x="1790" y="446" text-anchor="middle" font-size="12.5">coffee-analytics</text>
+  </g>
+  <g class="tile-g" id="tDestB">
+    <rect class="tile" x="1920" y="355" width="300" height="110" rx="14"/>
+    <text class="icon" x="1975" y="418" text-anchor="middle" font-size="26">📊</text>
+    <text class="tile-name" x="2010" y="406" font-size="17">CloudWatch</text>
+    <text class="tile-res" x="2010" y="430" font-size="13.5">metrics + dashboard</text>
+  </g>
+
+  <!-- ======================= PATH C — ANALYTICS ======================= -->
+  <text class="lane-title accC" x="1500" y="528">🟩 PATH C — ANALYTICS</text>
+  <g class="tile-g" id="tSqsC">
+    <rect class="tile" x="1500" y="555" width="160" height="110" rx="14"/>
+    <text class="icon" x="1580" y="596" text-anchor="middle" font-size="24">📨</text>
+    <text class="tile-name" x="1580" y="624" text-anchor="middle" font-size="16">SQS</text>
+    <text class="tile-res" x="1580" y="646" text-anchor="middle" font-size="12.5">coffee-s3-queue</text>
+  </g>
+  <g class="tile-g" id="tLamC">
+    <rect class="tile" x="1710" y="555" width="160" height="110" rx="14"/>
+    <text class="icon" x="1790" y="596" text-anchor="middle" font-size="24">λ</text>
+    <text class="tile-name" x="1790" y="624" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="tile-res" x="1790" y="646" text-anchor="middle" font-size="12.5">coffee-s3-writer</text>
+  </g>
+  <g class="tile-g" id="tS3C">
+    <rect class="tile" x="1920" y="555" width="104" height="110" rx="14"/>
+    <text class="icon" x="1972" y="600" text-anchor="middle" font-size="24">🪣</text>
+    <text class="tile-name" x="1972" y="630" text-anchor="middle" font-size="15">S3</text>
+    <text class="tile-res" x="1972" y="650" text-anchor="middle" font-size="11.5">raw orders</text>
+  </g>
+  <g class="tile-g" id="tGlueC">
+    <rect class="tile" x="2040" y="555" width="104" height="110" rx="14"/>
+    <text class="icon" x="2092" y="600" text-anchor="middle" font-size="24">🧩</text>
+    <text class="tile-name" x="2092" y="630" text-anchor="middle" font-size="15">Glue</text>
+    <text class="tile-res" x="2092" y="650" text-anchor="middle" font-size="11.5">catalog</text>
+  </g>
+  <g class="tile-g" id="tAthC">
+    <rect class="tile" x="2160" y="555" width="104" height="110" rx="14"/>
+    <text class="icon" x="2212" y="600" text-anchor="middle" font-size="24">🔍</text>
+    <text class="tile-name" x="2212" y="630" text-anchor="middle" font-size="15">Athena</text>
+    <text class="tile-res" x="2212" y="650" text-anchor="middle" font-size="11.5">SQL queries</text>
+  </g>
+
+  <!-- ======================= PATH D — AI RECOMMENDER ======================= -->
+  <text class="lane-title accD" x="1500" y="728">🟧 PATH D — AI RECOMMENDER</text>
+  <g class="tile-g" id="tSqsD">
+    <rect class="tile" x="1500" y="755" width="160" height="110" rx="14"/>
+    <text class="icon" x="1580" y="796" text-anchor="middle" font-size="24">📨</text>
+    <text class="tile-name" x="1580" y="824" text-anchor="middle" font-size="16">SQS</text>
+    <text class="tile-res" x="1580" y="846" text-anchor="middle" font-size="11">coffee-recommendation-queue</text>
+  </g>
+  <g class="tile-g" id="tLamD">
+    <rect class="tile" x="1710" y="755" width="160" height="110" rx="14"/>
+    <text class="icon" x="1790" y="796" text-anchor="middle" font-size="24">λ</text>
+    <text class="tile-name" x="1790" y="824" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="tile-res" x="1790" y="846" text-anchor="middle" font-size="12.5">coffee-recommender</text>
+  </g>
+  <g class="tile-g" id="tBedD">
+    <rect class="tile" x="1920" y="755" width="134" height="110" rx="14"/>
+    <text class="icon" x="1987" y="800" text-anchor="middle" font-size="24">🤖</text>
+    <text class="tile-name" x="1987" y="828" text-anchor="middle" font-size="15">Bedrock</text>
+    <text class="tile-res" x="1987" y="848" text-anchor="middle" font-size="11.5">Claude</text>
+  </g>
+  <g class="tile-g" id="tDdbD">
+    <rect class="tile" x="2070" y="755" width="200" height="110" rx="14"/>
+    <text class="icon" x="2114" y="812" text-anchor="middle" font-size="24">🗄️</text>
+    <text class="tile-name" x="2140" y="804" font-size="15">DynamoDB</text>
+    <text class="tile-res" x="2140" y="826" font-size="11.5">coffee-recommendations</text>
+  </g>
+
+  <!-- ======================= LEGEND ======================= -->
+  <text class="legend-title" x="48" y="845">CROSS-CUTTING</text>
+  <rect class="badge" x="40" y="862" width="330" height="32" rx="16"/>
+  <text class="badge-text" x="58" y="883">📍 Region us-west-2 · Bedrock invoked in us-east-1</text>
+  <rect class="badge" x="40" y="902" width="330" height="32" rx="16"/>
+  <text class="badge-text" x="58" y="923">🔐 Least-privilege IAM — bb-* roles</text>
+  <rect class="badge" x="40" y="942" width="330" height="32" rx="16"/>
+  <text class="badge-text" x="58" y="963">📝 CloudWatch Logs on every Lambda</text>
+  <rect class="badge" x="385" y="862" width="280" height="32" rx="16"/>
+  <text class="badge-text" x="403" y="883">📣 SNS → SQS · Raw Delivery OFF</text>
+
+  <!-- ======================= ANIMATION LAYER ======================= -->
+  <text id="caption" x="1880" y="965" text-anchor="middle">One event → four reactions, in parallel.</text>
+  <g id="pulseLayer"></g>
+</svg>
+</main>
+
+<script>
+(function(){
+  const svgns = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  const pulseLayer = $("pulseLayer");
+  const playBtn = $("playBtn"), resetBtn = $("resetBtn");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let playing = false;
+
+  const LANES = [
+    {guide:"gA", cls:"lit-A", color:"#6f4e37", dests:["tDestA"]},
+    {guide:"gB", cls:"lit-B", color:"#2563eb", dests:["tDestB"]},
+    {guide:"gC", cls:"lit-C", color:"#16a34a", dests:["tS3C","tGlueC","tAthC"]},
+    {guide:"gD", cls:"lit-D", color:"#f59e0b", dests:["tBedD","tDdbD"]}
+  ];
+
+  function makePulse(color){
+    const g = document.createElementNS(svgns,"g");
+    const glow = document.createElementNS(svgns,"circle");
+    glow.setAttribute("r","16"); glow.setAttribute("fill",color); glow.setAttribute("opacity","0.4");
+    const core = document.createElementNS(svgns,"circle");
+    core.setAttribute("r","7"); core.setAttribute("fill","#fff");
+    core.setAttribute("stroke",color); core.setAttribute("stroke-width","3");
+    g.appendChild(glow); g.appendChild(core);
+    pulseLayer.appendChild(g);
+    return g;
+  }
+
+  function travel(pulse, path, duration){
+    return new Promise(resolve=>{
+      const len = path.getTotalLength();
+      const start = performance.now();
+      function frame(now){
+        let t = Math.min((now - start)/duration, 1);
+        // ease in-out
+        const e = t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+        const pt = path.getPointAtLength(e*len);
+        pulse.setAttribute("transform", "translate("+pt.x+","+pt.y+")");
+        if(t < 1) requestAnimationFrame(frame); else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function flash(id, ms){
+    const el = $(id); el.classList.add("on");
+    setTimeout(()=>el.classList.remove("on"), ms);
+  }
+
+  function lightUp(lane, idx, count){
+    lane.dests.forEach((d,i)=>{
+      // stagger chained destinations slightly
+      setTimeout(()=> $(d).classList.add(lane.cls), i*180);
+    });
+  }
+
+  function clearAll(){
+    pulseLayer.innerHTML = "";
+    $("caption").classList.remove("on");
+    $("wafFlash").classList.remove("on");
+    $("snsFlash").classList.remove("on");
+    LANES.forEach(l => l.dests.forEach(d => $(d).classList.remove(l.cls)));
+  }
+
+  async function play(){
+    if(playing) return;
+    playing = true; playBtn.disabled = true;
+    clearAll();
+
+    if(reduced){
+      // No motion: simply highlight the end state.
+      flash("wafFlash", 4000); flash("snsFlash", 4000);
+      LANES.forEach(l => lightUp(l));
+      $("caption").classList.add("on");
+      playing = false; playBtn.disabled = false;
+      return;
+    }
+
+    const pulse = makePulse("#f59e0b");
+
+    await travel(pulse, $("p1"), 420);          // browser -> WAF
+    flash("wafFlash", 1200);
+    await travel(pulse, $("p2"), 420);          // WAF -> IGW
+    await travel(pulse, $("p3"), 320);          // IGW -> ALB
+    await travel(pulse, $("p4"), 420);          // ALB -> Fargate
+    await travel(pulse, $("p5"), 520);          // Fargate -> SNS
+    flash("snsFlash", 1400);
+    pulse.remove();
+
+    await new Promise(r=>setTimeout(r,180));
+
+    // fan out: 4 pulses simultaneously
+    const runs = LANES.map(lane=>{
+      const p = makePulse(lane.color);
+      return travel(p, $(lane.guide), 1900).then(()=>{
+        lightUp(lane);
+        p.remove();
+      });
+    });
+    await Promise.all(runs);
+
+    $("caption").classList.add("on");
+    playing = false; playBtn.disabled = false;
+  }
+
+  playBtn.addEventListener("click", play);
+  resetBtn.addEventListener("click", ()=>{ if(!playing) clearAll(); });
+})();
+</script>
+</body>
+</html>
