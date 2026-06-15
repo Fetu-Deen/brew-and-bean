@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evangadi Coffee Shop — Cloud Demo</title>
+<style>
+  /* ============================================================
+     EVANGADI COFFEE SHOP — DEMO DECK
+     Single file · no dependencies · works offline
+     Navigate: ← → (or ↑ ↓ / Space) · Home / End · F = fullscreen
+     Click the dots to jump. Counter is bottom-right.
+
+     SLIDE NUMBERS ARE AUTOMATIC — the "NN ·" in each kicker comes
+     from the slide's position, so you can add/move/remove slides
+     without renumbering anything.
+
+     >>> TO ADD A DIAGRAM IMAGE LATER:
+         Find the slide in the DECK array (bottom of file) and set
+         its diagram image, e.g.  image: 'architecture.png'
+         (put the file next to this .html). The dashed placeholder
+         is then replaced automatically by your image.
+     ============================================================ */
+
+  :root{
+    /* palette */
+    --espresso:#5a3f2c;
+    --coffee:#6f4e37;
+    --cream:#f5f1eb;
+    --amber:#f59e0b;
+    --amber-deep:#d6850a;
+    --ink:#2a1c12;
+    --muted:#9a8369;
+    --crema:#ece2cf;
+    --crema-deep:#dccbb2;
+    --page:#241710;
+    --highlight:#fbe7bf;
+
+    /* type */
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    --serif: Georgia, "Times New Roman", serif;
+  }
+
+  *{ margin:0; padding:0; box-sizing:border-box; }
+
+  html,body{ height:100%; }
+  body{
+    font-family:var(--sans);
+    color:var(--ink);
+    background:
+      radial-gradient(120% 90% at 50% 0%, #34241700 30%, #1a0f08 100%),
+      var(--page);
+    overflow:hidden;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---- scaled 16:9 stage (logical 1280x720) ---- */
+  .stage{
+    position:fixed; left:50%; top:50%;
+    width:1280px; height:720px;
+    transform:translate(-50%,-50%) scale(var(--s,1));
+    transform-origin:center center;
+    background:var(--cream);
+    border-radius:18px;
+    overflow:hidden;
+    box-shadow:0 40px 120px -30px rgba(0,0,0,.65), 0 0 0 1px rgba(0,0,0,.25);
+  }
+
+  .slides{ position:absolute; inset:0; }
+
+  .slide{
+    position:absolute; inset:0;
+    opacity:0; transform:translateY(20px);
+    transition:opacity .5s ease, transform .55s cubic-bezier(.2,.7,.2,1);
+    pointer-events:none;
+  }
+  .slide.active{ opacity:1; transform:none; pointer-events:auto; }
+
+  .slide-inner{
+    position:absolute; inset:0;
+    padding:74px 96px 104px;
+  }
+
+  /* staggered entrance for any tagged child */
+  .s-item{ opacity:0; transform:translateY(16px); }
+  .slide.active .s-item{
+    animation:rise .6s cubic-bezier(.2,.7,.2,1) forwards;
+    animation-delay:calc(.10s + var(--i,0) * .07s);
+  }
+  @keyframes rise{ to{ opacity:1; transform:none; } }
+
+  /* ---------- shared bits ---------- */
+  .kicker{
+    font-family:var(--mono);
+    font-size:15px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--muted);
+    display:flex; align-items:center; gap:14px;
+    margin-bottom:22px;
+  }
+  .kicker::before{
+    content:""; width:34px; height:2px; background:var(--amber); border-radius:2px;
+    display:inline-block;
+  }
+
+  .title{
+    font-size:62px; font-weight:800; letter-spacing:-.02em; line-height:1.02;
+    color:var(--ink);
+    display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  }
+  .flag{
+    font-size:34px;
+    display:inline-grid; place-items:center;
+    width:62px; height:62px; border-radius:16px;
+    background:var(--cream);
+    box-shadow:inset 0 0 0 2px var(--crema-deep);
+  }
+
+  /* ---------- content layouts ---------- */
+  .content{ display:flex; flex-direction:column; justify-content:center; }
+  .content .title{ margin-bottom:38px; }
+
+  .content.two{
+    display:grid;
+    grid-template-columns:minmax(0,.86fr) minmax(0,1.14fr);
+    gap:56px; align-items:center;
+  }
+  .content.two.paths{ grid-template-columns:1fr 1fr; }
+  .content.two .col-main{ align-self:center; }
+  .content.two .title{ margin-bottom:30px; font-size:52px; }
+
+  /* ---------- bullet rows ---------- */
+  .bullets{ list-style:none; display:flex; flex-direction:column; }
+  .bul-3{ font-size:38px; gap:30px; }
+  .bul-4{ font-size:33px; gap:24px; }
+  .bul-5{ font-size:29px; gap:19px; }
+  .content.two .bullets{ font-size:25px; gap:18px; }
+  .content.two.paths .bullets{ font-size:24px; gap:16px; }
+
+  .row{
+    display:flex; align-items:center; gap:22px;
+    line-height:1.22; font-weight:600; color:var(--ink);
+  }
+  .content.two .row{ gap:18px; }
+
+  .tile{
+    flex:none;
+    width:64px; height:64px; border-radius:17px;
+    display:grid; place-items:center;
+    font-size:31px; line-height:1;
+    background:var(--crema);
+    box-shadow:inset 0 0 0 1px var(--crema-deep), 0 4px 10px -6px rgba(90,63,44,.5);
+  }
+  .bul-5 .tile{ width:56px; height:56px; font-size:27px; border-radius:15px; }
+  .content.two .tile{ width:48px; height:48px; font-size:24px; border-radius:13px; }
+
+  .cue{ flex:1 1 auto; }
+  .owner{
+    flex:none;
+    font-family:var(--mono); font-size:14px; font-weight:600;
+    letter-spacing:.06em; text-transform:uppercase;
+    color:var(--amber-deep);
+    padding:6px 12px; border-radius:999px;
+    background:var(--highlight);
+    box-shadow:inset 0 0 0 1px rgba(214,133,10,.25);
+  }
+
+  /* ---------- diagram placeholder ---------- */
+  .diagram{ height:100%; min-height:0; display:flex; }
+  .dgm-frame{
+    position:relative; flex:1;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:14px;
+    padding:40px 38px;
+    border:2px dashed var(--coffee);
+    border-radius:22px;
+    background:
+      repeating-linear-gradient(45deg, rgba(111,78,55,.04) 0 12px, transparent 12px 24px),
+      #efe7d8;
+    min-height:380px;
+  }
+  .dgm-icon{ color:var(--coffee); opacity:.55; }
+  .dgm-label{
+    font-family:var(--mono); font-size:13px; letter-spacing:.28em; text-transform:uppercase;
+    color:var(--amber-deep); font-weight:700;
+  }
+  .dgm-cap{
+    font-family:var(--mono); font-size:16px; line-height:1.55; color:var(--coffee);
+    max-width:46ch;
+  }
+  .dgm-hint{
+    font-family:var(--mono); font-size:12px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted);
+  }
+  .tick{ position:absolute; width:18px; height:18px; border:2px solid var(--amber); }
+  .tick.tl{ top:12px; left:12px; border-right:none; border-bottom:none; }
+  .tick.tr{ top:12px; right:12px; border-left:none; border-bottom:none; }
+  .tick.bl{ bottom:12px; left:12px; border-right:none; border-top:none; }
+  .tick.br{ bottom:12px; right:12px; border-left:none; border-top:none; }
+  .dgm-frame.has-img{ border-style:solid; border-color:var(--crema-deep); padding:14px; background:#fff; }
+  .dgm-frame.has-img img{ width:100%; height:100%; object-fit:contain; border-radius:10px; }
+
+  /* ---------- inline SVG art (e.g. menu board) ---------- */
+  .art{ width:100%; }
+  .art svg{
+    width:100%; height:auto; display:block; border-radius:16px;
+    filter:drop-shadow(0 20px 34px rgba(74,53,37,.4));
+  }
+
+  /* ---------- title slide ---------- */
+  .title-slide{
+    display:grid; grid-template-columns:1.05fr .95fr; gap:40px; align-items:center;
+  }
+  .brand{ display:flex; flex-direction:column; gap:6px; margin:6px 0 26px; }
+  .brand-name{ font-size:104px; font-weight:800; letter-spacing:-.035em; line-height:.92; color:var(--ink); }
+  .brand-sub{
+    font-family:var(--mono); font-size:24px; letter-spacing:.42em; text-transform:uppercase;
+    color:var(--coffee); padding-left:4px;
+  }
+  .tagline{ font-size:25px; line-height:1.45; color:var(--coffee); max-width:30ch; font-weight:500; }
+  .team{ display:flex; flex-wrap:wrap; gap:10px; margin-top:30px; }
+  .chip{
+    font-family:var(--mono); font-size:14px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--espresso); font-weight:600;
+    padding:9px 16px; border-radius:999px;
+    background:var(--crema); box-shadow:inset 0 0 0 1px var(--crema-deep);
+  }
+  .hint{
+    margin-top:34px;
+    font-family:var(--mono); font-size:13px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted);
+  }
+  .t-art{ display:grid; place-items:center; }
+
+  /* ---------- closing slide ---------- */
+  .closing-slide{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; gap:8px;
+  }
+  .closing-slide .kicker{ justify-content:center; }
+  .closing-slide .kicker::before{ display:none; }
+  .closing-slide .title{ justify-content:center; font-size:78px; margin:6px 0 8px; }
+  .quote{
+    font-family:var(--serif); font-style:italic; font-size:42px; line-height:1.3;
+    color:var(--coffee); max-width:22ch; position:relative; margin:18px 0 10px;
+  }
+  .quote::before{ content:"\201C"; color:var(--amber); }
+  .quote::after{ content:"\201D"; color:var(--amber); }
+  .note{ font-size:21px; color:var(--ink); font-weight:500; margin-top:8px; }
+  .closing-slide .team{ justify-content:center; margin-top:24px; }
+  .c-cup{ margin-bottom:6px; }
+
+  /* ---------- chrome (footer bar) ---------- */
+  .chrome{
+    position:absolute; left:0; right:0; bottom:0; height:62px;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 52px;
+    border-top:1px solid var(--crema-deep);
+    background:linear-gradient(to top, rgba(245,241,235,1), rgba(245,241,235,0));
+    z-index:5;
+  }
+  .chrome-left{
+    font-size:15px; color:var(--muted); display:flex; align-items:center; gap:8px;
+    font-family:var(--mono); letter-spacing:.04em;
+  }
+  .chrome-left b{ color:var(--espresso); font-weight:700; }
+  .chrome-left .bean{ font-size:15px; }
+  .dots{ display:flex; align-items:center; gap:10px; }
+  .dot{
+    width:9px; height:9px; border-radius:50%; border:none; padding:0; cursor:pointer;
+    background:var(--crema-deep); transition:all .35s cubic-bezier(.2,.7,.2,1);
+  }
+  .dot:hover{ background:var(--amber); opacity:.6; }
+  .dot.on{ width:28px; border-radius:6px; background:var(--amber); }
+  .dot:focus-visible{ outline:2px solid var(--amber-deep); outline-offset:3px; }
+  .chrome-right{ display:flex; align-items:center; gap:18px; }
+  .counter{ font-family:var(--mono); font-size:15px; letter-spacing:.12em; color:var(--muted); }
+  .fs-btn{
+    background:none; border:none; cursor:pointer; color:var(--coffee);
+    display:grid; place-items:center; padding:6px; border-radius:8px; line-height:0;
+    transition:color .2s, background .2s;
+  }
+  .fs-btn:hover{ color:var(--amber-deep); background:var(--crema); }
+  .fs-btn:focus-visible{ outline:2px solid var(--amber-deep); outline-offset:2px; }
+
+  /* ---------- steam animation ---------- */
+  .steam path{
+    fill:none; stroke-width:9; stroke-linecap:round;
+    transform-box:fill-box; transform-origin:50% 100%;
+    animation:steam 3.4s ease-in-out infinite;
+  }
+  .steam path:nth-child(1){ stroke:var(--coffee); stroke-opacity:.42; animation-duration:3.6s; animation-delay:.0s; }
+  .steam path:nth-child(2){ stroke:var(--amber);  stroke-opacity:.55; animation-duration:3.1s; animation-delay:.7s; }
+  .steam path:nth-child(3){ stroke:var(--amber);  stroke-opacity:.5;  animation-duration:3.9s; animation-delay:.35s; }
+  .steam path:nth-child(4){ stroke:var(--coffee); stroke-opacity:.4;  animation-duration:3.3s; animation-delay:1.05s; }
+  @keyframes steam{
+    0%{ opacity:0; transform:translateY(8px) scaleX(1); }
+    22%{ opacity:1; }
+    70%{ opacity:.3; }
+    100%{ opacity:0; transform:translateY(-32px) scaleX(.82); }
+  }
+
+  /* ---------- reduced motion ---------- */
+  @media (prefers-reduced-motion: reduce){
+    .slide{ transition:opacity .2s ease; transform:none !important; }
+    .s-item{ opacity:1 !important; transform:none !important; animation:none !important; }
+    .steam path{ animation:none !important; opacity:.5; }
+    .dot{ transition:none; }
+  }
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <div class="slides" id="slides"></div>
+    <div class="chrome">
+      <div class="chrome-left"><span class="bean">☕</span> <b>Evangadi</b> / AWS demo</div>
+      <div class="dots" id="dots"></div>
+      <div class="chrome-right">
+        <span class="counter" id="counter">01 / 15</span>
+        <button class="fs-btn" id="fs" aria-label="Toggle fullscreen" title="Fullscreen (F)">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   THE COFFEE MENU BOARD  (inline SVG · no external file)
+   Used on the hook slide to show "choice overload".
+   ============================================================ */
+const MENU_BOARD = `
+<svg viewBox="0 0 560 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A crowded coffee menu board with many drinks">
+  <style>
+    .mb-h{ fill:#f5f1eb; font-family:var(--sans, system-ui, sans-serif); font-weight:800; }
+    .mb-sub{ fill:#f5b342; font-family:var(--mono, monospace); letter-spacing:.28em; }
+    .mb-name{ fill:#efe7d8; font-family:var(--sans, system-ui, sans-serif); font-weight:600; font-size:16px; }
+    .mb-price{ fill:#f5b342; font-family:var(--mono, monospace); font-size:14px; }
+    .mb-pick{ fill:#ffd27a; font-weight:800; }
+    .mb-more{ fill:#cdbfa8; font-family:var(--mono, monospace); font-style:italic; font-size:13px; }
+    .mb-tag{ fill:#f5b342; font-family:var(--mono, monospace); font-size:13px; }
+  </style>
+  <rect x="8" y="8" width="544" height="454" rx="20" fill="#42301e"/>
+  <rect x="20" y="20" width="520" height="430" rx="13" fill="none" stroke="#caa46a" stroke-width="2"/>
+  <text class="mb-h" x="280" y="62" text-anchor="middle" font-size="34">☕  THE MENU</text>
+  <text class="mb-sub" x="280" y="88" text-anchor="middle" font-size="12">PICK ONE · GOOD LUCK</text>
+  <line x1="44" y1="104" x2="516" y2="104" stroke="#f5f1eb" stroke-opacity=".18"/>
+  <line x1="283" y1="118" x2="283" y2="390" stroke="#f5f1eb" stroke-opacity=".1"/>
+
+  <!-- left column -->
+  <text class="mb-name"  x="48"  y="134">Espresso</text>      <text class="mb-price" x="268" y="134" text-anchor="end">$3.00</text>
+  <text class="mb-name"  x="48"  y="164">Americano</text>     <text class="mb-price" x="268" y="164" text-anchor="end">$3.50</text>
+  <text class="mb-name"  x="48"  y="194">Cappuccino</text>    <text class="mb-price" x="268" y="194" text-anchor="end">$4.00</text>
+  <text class="mb-name"  x="48"  y="224">Flat White</text>    <text class="mb-price" x="268" y="224" text-anchor="end">$4.00</text>
+  <text class="mb-name"  x="48"  y="254">Cortado</text>       <text class="mb-price" x="268" y="254" text-anchor="end">$4.00</text>
+  <text class="mb-name"  x="48"  y="284">Macchiato</text>     <text class="mb-price" x="268" y="284" text-anchor="end">$3.50</text>
+  <text class="mb-name"  x="48"  y="314">Caffè Mocha</text>   <text class="mb-price" x="268" y="314" text-anchor="end">$4.50</text>
+  <text class="mb-name"  x="48"  y="344">Caramel Latte</text> <text class="mb-price" x="268" y="344" text-anchor="end">$5.00</text>
+  <text class="mb-name"  x="48"  y="374">Chai Latte</text>    <text class="mb-price" x="268" y="374" text-anchor="end">$4.50</text>
+
+  <!-- right column -->
+  <text class="mb-name"  x="300" y="134">Cold Brew</text>     <text class="mb-price" x="512" y="134" text-anchor="end">$4.50</text>
+  <text class="mb-name"  x="300" y="164">Nitro Brew</text>    <text class="mb-price" x="512" y="164" text-anchor="end">$5.00</text>
+  <text class="mb-name"  x="300" y="194">Iced Latte</text>    <text class="mb-price" x="512" y="194" text-anchor="end">$4.50</text>
+  <text class="mb-name"  x="300" y="224">Affogato</text>      <text class="mb-price" x="512" y="224" text-anchor="end">$5.50</text>
+
+  <!-- the app's pick (a nod to Evangadi's Ethiopian roots) -->
+  <rect x="294" y="237" width="226" height="26" rx="7" fill="#f59e0b" fill-opacity=".16" stroke="#f5b342" stroke-width="1.2"/>
+  <text class="mb-name mb-pick" x="300" y="254">★ Yirgacheffe</text> <text class="mb-price" x="512" y="254" text-anchor="end">$5.00</text>
+
+  <text class="mb-name"  x="300" y="284">Harrar</text>        <text class="mb-price" x="512" y="284" text-anchor="end">$5.00</text>
+  <text class="mb-name"  x="300" y="314">Sidamo</text>        <text class="mb-price" x="512" y="314" text-anchor="end">$5.00</text>
+  <text class="mb-name"  x="300" y="344">Matcha Latte</text>  <text class="mb-price" x="512" y="344" text-anchor="end">$4.50</text>
+  <text class="mb-name"  x="300" y="374">Hot Cocoa</text>     <text class="mb-price" x="512" y="374" text-anchor="end">$4.00</text>
+
+  <line x1="44" y1="402" x2="516" y2="402" stroke="#f5f1eb" stroke-opacity=".18"/>
+  <text class="mb-tag"  x="48"  y="428">★ today’s pick</text>
+  <text class="mb-more" x="512" y="428" text-anchor="end">+ 20 more on the wall…</text>
+</svg>`;
+
+/* ============================================================
+   SLIDE CONTENT  —  edit text here; bullets stay short cues.
+   Slide numbers are added automatically from position.
+   For diagram slides set image:'file.png' to swap in a picture.
+   ============================================================ */
+const DECK = [
+  { type:'title',
+    kicker:'Evangadi · cloud computing demo',
+    brandName:'Evangadi', brandSub:'Coffee Shop',
+    tagline:'Event-driven coffee ordering on AWS, with an AI recommender.',
+    team:['Demel','Fetu','Sedik','Sintayehu'],
+    hint:'←  →  navigate   ·   F  fullscreen'
+  },
+
+  /* ---- HOOK: choice overload → why an AI recommender ---- */
+  { type:'content', kicker:'The everyday problem', title:'What should I try?', flag:'🤔', two:true,
+    bullets:[
+      {i:'☕', t:'Dozens of drinks, one decision'},
+      {i:'🤯', t:'Too many options, every time'},
+      {i:'🤖', t:'So the app suggests one'},
+      {i:'🌍', t:'Amazon’s problem, smaller scale'},
+    ],
+    art: MENU_BOARD
+  },
+
+  { type:'content', kicker:'What we built', title:'What we built',
+    bullets:[
+      {i:'🛒', t:'A coffee app — event-driven underneath'},
+      {i:'⚡', t:'One order → four services'},
+      {i:'🤖', t:'AI suggests your next drink'},
+    ]
+  },
+  { type:'content', kicker:'Architecture', title:'Architecture', two:true,
+    bullets:[
+      {i:'🌐', t:'WAF → Load Balancer at edge'},
+      {i:'📦', t:'ECS Fargate in custom VPC'},
+      {i:'📣', t:'One SNS topic — the hub'},
+      {i:'🔀', t:'Fans out to four paths'},
+    ],
+    diagram:{ caption:'Master architecture — WAF → ALB → ECS / Fargate in custom VPC → SNS → Paths A / B / C / D', image:null }
+  },
+  { type:'content', kicker:'Live demo', title:'Live demo', flag:'🎬',
+    bullets:[
+      {i:'🛒', t:'Place a real order'},
+      {i:'⚡', t:'Instant confirmation'},
+      {i:'🤖', t:'AI rec in ~2–3s'},
+      {i:'🔎', t:'Lands in DynamoDB + CloudWatch'},
+    ]
+  },
+  { type:'content', kicker:'The AI path', title:'The AI path', two:true,
+    bullets:[
+      {i:'🧠', t:'Claude via Amazon Bedrock'},
+      {i:'🕒', t:'Async — order never waits'},
+      {i:'📚', t:'History-aware suggestions'},
+      {i:'🔁', t:'Browser polls until ready'},
+    ],
+    diagram:{ caption:'AI recommendation flow — sync confirm + async poll', image:null }
+  },
+  { type:'content', kicker:'The four fan-out paths', title:'Four fan-out paths', two:true, paths:true,
+    bullets:[
+      {i:'💾', t:'Path A — Persistence → DynamoDB', owner:'Sedik'},
+      {i:'📊', t:'Path B — Monitoring → CloudWatch', owner:'Sintayehu'},
+      {i:'🪣', t:'Path C — Analytics → S3 → Athena', owner:'Demel'},
+      {i:'🤖', t:'Path D — AI → Bedrock', owner:'Fetu'},
+      {i:'🧩', t:'Same pattern, four destinations'},
+    ],
+    diagram:{ caption:'Generic path — SNS → SQS → Lambda → destination', image:null }
+  },
+  { type:'content', kicker:'Security', title:'Security', flag:'🔒',
+    bullets:[
+      {i:'🏗️', t:'Custom VPC — two AZs'},
+      {i:'🚪', t:'SG chaining — ALB only'},
+      {i:'👤', t:'Least-privilege IAM per user'},
+      {i:'🛡️', t:'Deny guardrail — no escalation'},
+      {i:'🧱', t:'AWS WAF blocks attacks'},
+    ]
+  },
+  { type:'content', kicker:'How we collaborated', title:'How we collaborated', flag:'🤝',
+    bullets:[
+      {i:'🐙', t:'GitHub — branches + PR reviews'},
+      {i:'📚', t:'Docs-first + onboarding kit'},
+      {i:'🗓️', t:'Standups Mon / Wed / Fri'},
+      {i:'💬', t:'WhatsApp day-to-day'},
+      {i:'🔑', t:'IAM users — safe parallel work'},
+    ]
+  },
+  { type:'content', kicker:'Challenges we solved', title:'Challenges we solved', flag:'💥',
+    bullets:[
+      {i:'🏗️', t:'arm64 → x86_64 image fix'},
+      {i:'🌎', t:'Bedrock cross-region access'},
+      {i:'🔐', t:'IAM least-privilege debugging'},
+      {i:'🚀', t:'Deploy discipline: local ≠ cloud'},
+      {i:'🧠', t:'Blocked privilege escalation'},
+    ]
+  },
+  { type:'content', kicker:'Limitations', title:'Limitations', flag:'📌',
+    bullets:[
+      {i:'🔁', t:'Polling, not push'},
+      {i:'👤', t:'Name-based (no accounts)'},
+      {i:'🛠️', t:'Manual deploys (no CI/CD)'},
+      {i:'🌎', t:'Single-region'},
+    ]
+  },
+  { type:'content', kicker:'Future integrations', title:'Future integrations', flag:'🔮',
+    bullets:[
+      {i:'⚡', t:'Push recs (WebSocket)'},
+      {i:'📈', t:'QuickSight dashboards'},
+      {i:'🔄', t:'CI/CD pipeline'},
+      {i:'🔐', t:'Accounts + auth'},
+      {i:'🌐', t:'Private subnets / multi-region'},
+    ]
+  },
+  { type:'content', kicker:'Cost discipline', title:'Cost discipline', flag:'💰',
+    bullets:[
+      {i:'🆓', t:'Free-tier first'},
+      {i:'🚫', t:'No NAT gateway'},
+      {i:'🔽', t:'Scale compute to zero'},
+      {i:'🧾', t:'Budget alerts + teardown'},
+    ]
+  },
+
+  /* ---- bridge: the patterns transfer to real systems ---- */
+  { type:'content', kicker:'Real-world patterns', title:'Real-world patterns', flag:'🌍',
+    bullets:[
+      {i:'🛒', t:'Amazon — recommends from your history'},
+      {i:'🎬', t:'Netflix — one play, four reactions'},
+      {i:'🚗', t:'Uber Eats — one request, many services'},
+      {i:'☕', t:'Us — same bones, smaller scale'},
+      {i:'🎓', t:'Architecture transfers — problem size doesn’t'},
+    ]
+  },
+
+  { type:'closing', kicker:'Thank you', title:'Thank you ☕',
+    quote:'One order, four places — none knows the others exist.',
+    note:'Questions? Each of us can go deep on our own path.',
+    team:['Demel','Fetu','Sedik','Sintayehu']
+  },
+];
+
+/* ---------- reusable SVG: espresso cup with forking steam ---------- */
+function cupSVG(size){
+  return `
+  <svg width="${size}" height="${size}" viewBox="0 0 440 440" role="img" aria-label="Espresso cup with steam">
+    <defs>
+      <linearGradient id="crema" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#f8d68f"/>
+        <stop offset="1" stop-color="#dcb878"/>
+      </linearGradient>
+    </defs>
+    <g class="steam">
+      <path d="M186 210 C172 192 184 176 172 156 C162 140 172 126 164 108"/>
+      <path d="M210 214 C196 192 214 178 200 156 C188 138 202 124 192 104"/>
+      <path d="M232 214 C246 190 230 176 244 154 C256 136 244 122 252 102"/>
+      <path d="M256 210 C270 192 258 176 270 156 C280 140 272 126 280 110"/>
+    </g>
+    <ellipse cx="220" cy="352" rx="170" ry="26" fill="#5a3f2c"/>
+    <ellipse cx="220" cy="345" rx="158" ry="18" fill="#6f4e37"/>
+    <path d="M328 252 C388 250 396 304 360 322 C346 330 336 326 330 318" fill="none" stroke="#6f4e37" stroke-width="20" stroke-linecap="round"/>
+    <path d="M104 232 C104 252 122 320 220 320 C318 320 336 252 336 232 Z" fill="#6f4e37"/>
+    <ellipse cx="220" cy="232" rx="118" ry="30" fill="#5a3f2c"/>
+    <ellipse cx="220" cy="230" rx="100" ry="23" fill="url(#crema)"/>
+    <ellipse cx="220" cy="226" rx="62" ry="11" fill="#fbe3b3" opacity=".55"/>
+  </svg>`;
+}
+
+/* ---------- diagram block ---------- */
+function diagramBlock(d){
+  if(d.image){
+    return `<div class="diagram"><div class="dgm-frame has-img"><img src="${d.image}" alt=""></div></div>`;
+  }
+  return `<div class="diagram"><div class="dgm-frame">
+      <span class="tick tl"></span><span class="tick tr"></span><span class="tick bl"></span><span class="tick br"></span>
+      <svg class="dgm-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>
+      <div class="dgm-label">Diagram</div>
+      <div class="dgm-cap">${d.caption}</div>
+      <div class="dgm-hint">paste image here</div>
+    </div></div>`;
+}
+
+/* ---------- build a slide ---------- */
+function buildSlide(s, idx){
+  const slide = document.createElement('div');
+  slide.className = 'slide';
+  const num = String(idx + 1).padStart(2, '0');
+  let n = 0;                      // stagger index
+  const it = () => `style="--i:${n++}"`;
+
+  if(s.type === 'title'){
+    const chips = s.team.map(name => `<span class="chip">${name}</span>`).join('');
+    slide.innerHTML = `
+      <div class="slide-inner title-slide">
+        <div class="t-left">
+          <div class="kicker s-item" ${it()}>${s.kicker}</div>
+          <div class="brand s-item" ${it()}>
+            <span class="brand-name">${s.brandName}</span>
+            <span class="brand-sub">${s.brandSub}</span>
+          </div>
+          <p class="tagline s-item" ${it()}>${s.tagline}</p>
+          <div class="team s-item" ${it()}>${chips}</div>
+          <div class="hint s-item" ${it()}>${s.hint}</div>
+        </div>
+        <div class="t-art s-item" ${it()}>${cupSVG(360)}</div>
+      </div>`;
+  }
+  else if(s.type === 'closing'){
+    const chips = s.team.map(name => `<span class="chip">${name}</span>`).join('');
+    slide.innerHTML = `
+      <div class="slide-inner closing-slide">
+        <div class="c-cup s-item" ${it()}>${cupSVG(150)}</div>
+        <div class="kicker s-item" ${it()}>${num} · ${s.kicker}</div>
+        <h2 class="title s-item" ${it()}>${s.title}</h2>
+        <blockquote class="quote s-item" ${it()}>${s.quote}</blockquote>
+        <p class="note s-item" ${it()}>${s.note}</p>
+        <div class="team s-item" ${it()}>${chips}</div>
+      </div>`;
+  }
+  else { /* content */
+    const flag = s.flag ? `<span class="flag">${s.flag}</span>` : '';
+    const rows = s.bullets.map(b => `
+      <li class="row s-item" ${it()}>
+        <span class="tile">${b.i}</span>
+        <span class="cue">${b.t}</span>
+        ${b.owner ? `<span class="owner">${b.owner}</span>` : ''}
+      </li>`).join('');
+    const bulClass = `bul-${s.bullets.length}`;
+
+    const main = `
+      <div class="col-main">
+        <div class="kicker s-item" ${it()}>${num} · ${s.kicker}</div>
+        <h2 class="title s-item" ${it()}>${flag}${s.title}</h2>
+        <ul class="bullets ${bulClass}">${rows}</ul>
+      </div>`;
+
+    if(s.diagram || s.art){
+      const cls = 'content two' + (s.paths ? ' paths' : '');
+      const aside = s.art ? `<div class="art">${s.art}</div>` : diagramBlock(s.diagram);
+      slide.innerHTML = `<div class="slide-inner ${cls}">
+          ${main}
+          <div class="col-aside s-item" ${it()}>${aside}</div>
+        </div>`;
+    } else {
+      slide.innerHTML = `<div class="slide-inner content">${main}</div>`;
+    }
+  }
+  return slide;
+}
+
+/* ---------- render deck ---------- */
+const slidesEl = document.getElementById('slides');
+const dotsEl   = document.getElementById('dots');
+const counterEl= document.getElementById('counter');
+const total = DECK.length;
+
+DECK.forEach((s, idx) => {
+  slidesEl.appendChild(buildSlide(s, idx));
+  const dot = document.createElement('button');
+  dot.className = 'dot';
+  dot.setAttribute('aria-label', `Go to slide ${idx+1}`);
+  dot.addEventListener('click', () => goto(idx));
+  dotsEl.appendChild(dot);
+});
+
+const slideNodes = Array.from(slidesEl.children);
+const dotNodes   = Array.from(dotsEl.children);
+let current = 0;
+
+function render(){
+  slideNodes.forEach((el,i)=> el.classList.toggle('active', i===current));
+  dotNodes.forEach((el,i)=> el.classList.toggle('on', i===current));
+  counterEl.textContent = String(current+1).padStart(2,'0') + ' / ' + total;
+}
+function goto(i){
+  current = Math.max(0, Math.min(total-1, i));
+  render();
+}
+function next(){ if(current < total-1) goto(current+1); }
+function prev(){ if(current > 0) goto(current-1); }
+
+/* ---------- keyboard ---------- */
+window.addEventListener('keydown', (e)=>{
+  const k = e.key;
+  if(k==='ArrowRight'||k==='ArrowDown'||k==='PageDown'||k===' '||k==='Spacebar'){ e.preventDefault(); next(); }
+  else if(k==='ArrowLeft'||k==='ArrowUp'||k==='PageUp'||k==='Backspace'){ e.preventDefault(); prev(); }
+  else if(k==='Home'){ e.preventDefault(); goto(0); }
+  else if(k==='End'){ e.preventDefault(); goto(total-1); }
+  else if(k==='f'||k==='F'){ e.preventDefault(); toggleFS(); }
+});
+
+/* ---------- touch swipe ---------- */
+let tx=0, ty=0;
+window.addEventListener('touchstart', e=>{ const t=e.changedTouches[0]; tx=t.clientX; ty=t.clientY; }, {passive:true});
+window.addEventListener('touchend', e=>{
+  const t=e.changedTouches[0]; const dx=t.clientX-tx, dy=t.clientY-ty;
+  if(Math.abs(dx)>50 && Math.abs(dx)>Math.abs(dy)){ dx<0 ? next() : prev(); }
+}, {passive:true});
+
+/* ---------- fullscreen ---------- */
+function toggleFS(){
+  if(!document.fullscreenElement){ document.documentElement.requestFullscreen?.(); }
+  else{ document.exitFullscreen?.(); }
+}
+document.getElementById('fs').addEventListener('click', ()=>{ toggleFS(); document.activeElement.blur(); });
+
+/* ---------- scale stage to viewport ---------- */
+const stage = document.getElementById('stage');
+function fit(){
+  const pad = document.fullscreenElement ? 0 : 28;
+  const s = Math.min((window.innerWidth - pad*2)/1280, (window.innerHeight - pad*2)/720);
+  stage.style.setProperty('--s', s);
+}
+window.addEventListener('resize', fit);
+document.addEventListener('fullscreenchange', fit);
+fit();
+render();
+</script>
+</body>
+</html>

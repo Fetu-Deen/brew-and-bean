@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evangadi Coffee Shop — Event-Driven Architecture on AWS</title>
+<style>
+  :root{
+    --ink:#232F3E; --sub:#5f6b7a; --awsorange:#FF9900;
+    --purple:#8C4FFF; --green:#7AA116; --pink:#E7157B;
+    --magenta:#C925D1; --teal:#01A88D; --red:#DD344C; --orange:#ED7100;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:#fff;
+    font-family:'Amazon Ember','Segoe UI','Helvetica Neue',Arial,sans-serif;
+    color:var(--ink);
+    display:flex; flex-direction:column; height:100vh; overflow:hidden;
+  }
+  header{
+    background:var(--ink); color:#fff;
+    display:flex; align-items:center; gap:18px;
+    padding:13px 28px; flex:0 0 auto;
+  }
+  header .cup{font-size:25px;}
+  header h1{font-size:21px; font-weight:700; letter-spacing:.3px;}
+  header .subt{font-size:12.5px; opacity:.8; margin-top:2px; letter-spacing:.4px;}
+  header .spacer{flex:1;}
+  button{
+    font-family:inherit; font-size:14.5px; font-weight:700;
+    border:none; border-radius:999px; padding:10px 22px; cursor:pointer;
+    transition:transform .12s ease, box-shadow .12s ease, opacity .12s;
+  }
+  button:active{transform:scale(.97);}
+  #playBtn{background:var(--awsorange); color:#232F3E; box-shadow:0 3px 10px rgba(0,0,0,.3);}
+  #playBtn:hover{box-shadow:0 5px 16px rgba(0,0,0,.4);}
+  #resetBtn{background:rgba(255,255,255,.14); color:#fff; margin-left:10px;}
+  #resetBtn:hover{background:rgba(255,255,255,.26);}
+  button:disabled{opacity:.45; cursor:default;}
+  main{flex:1; display:flex; align-items:center; justify-content:center; padding:8px 12px; min-height:0;}
+  svg{width:100%; height:100%; display:block;}
+
+  /* ---- SVG styling ---- */
+  text{font-family:'Amazon Ember','Segoe UI','Helvetica Neue',Arial,sans-serif;}
+  .lbl{font-size:17px; font-weight:700; fill:var(--ink);}
+  .sub2{font-size:14px; fill:var(--sub); font-weight:600;}
+  .lane-title{font-size:17px; font-weight:800; fill:var(--ink); letter-spacing:.6px;}
+  .frame{fill:none; stroke:var(--ink); stroke-width:2.2;}
+  .vpc-box{fill:none; stroke:var(--purple); stroke-width:2.4;}
+  .vpc-lbl{font-size:17px; font-weight:800; fill:var(--purple);}
+  .subnet{fill:rgba(122,161,22,.04); stroke:var(--green); stroke-width:1.8; stroke-dasharray:7 5;}
+  .subnet-lbl{font-size:14px; font-weight:700; fill:var(--green);}
+  .flow{fill:none; stroke:var(--ink); stroke-width:2.3; marker-end:url(#arr);}
+  .flow-dash{fill:none; stroke:var(--ink); stroke-width:2.1; stroke-dasharray:8 6; marker-end:url(#arr);}
+  .flow-label{font-size:14px; font-weight:700; fill:var(--sub);}
+  .headline{font-size:24px; font-weight:800; fill:var(--ink); font-style:italic;}
+  .glyph{stroke:#fff; stroke-width:4; fill:none; stroke-linecap:round; stroke-linejoin:round;}
+  .dark-glyph{stroke:var(--ink); stroke-width:4; fill:none; stroke-linecap:round; stroke-linejoin:round;}
+  .step{fill:var(--ink);}
+  .step-n{font-size:16px; font-weight:800; fill:#fff;}
+  .note{font-size:13px; fill:var(--sub); font-weight:600;}
+
+  .icon-g{transition:filter .35s ease;}
+  .lit-A{filter:drop-shadow(0 0 14px rgba(201,37,209,.85));}
+  .lit-B{filter:drop-shadow(0 0 14px rgba(231,21,123,.85));}
+  .lit-C{filter:drop-shadow(0 0 14px rgba(108,174,62,.95));}
+  .lit-D{filter:drop-shadow(0 0 14px rgba(1,168,141,.95));}
+  .flash{font-size:16px; font-weight:800; opacity:0; transition:opacity .25s ease;}
+  .flash.on{opacity:1;}
+  .fl-green{fill:var(--green);} .fl-orange{fill:var(--awsorange);}
+  #caption{font-size:26px; font-weight:800; fill:var(--ink); font-style:italic;
+           opacity:0; transition:opacity .9s ease;}
+  #caption.on{opacity:1;}
+  @media (prefers-reduced-motion: reduce){
+    .icon-g,.flash,#caption{transition:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="cup">☕</span>
+  <div>
+    <h1>Evangadi Coffee Shop — Event-Driven Architecture on AWS</h1>
+    <div class="subt">Team Brew &amp; Bean · Capstone Demo Defense · us-west-2</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="playBtn">▶&nbsp; Play flow</button>
+  <button id="resetBtn">Reset</button>
+</header>
+
+<main>
+<svg viewBox="0 0 2240 1010" xmlns="http://www.w3.org/2000/svg" aria-label="Architecture diagram">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#232F3E"/>
+    </marker>
+    <linearGradient id="gOrange" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#C8511B"/><stop offset="1" stop-color="#FF9900"/>
+    </linearGradient>
+    <linearGradient id="gPink" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#B0084D"/><stop offset="1" stop-color="#FF4F8B"/>
+    </linearGradient>
+    <linearGradient id="gPurple" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#4D27A8"/><stop offset="1" stop-color="#A166FF"/>
+    </linearGradient>
+    <linearGradient id="gGreen" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#1B660F"/><stop offset="1" stop-color="#6CAE3E"/>
+    </linearGradient>
+    <linearGradient id="gRed" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#BD0816"/><stop offset="1" stop-color="#FF5252"/>
+    </linearGradient>
+    <linearGradient id="gMagenta" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#7B1FA2"/><stop offset="1" stop-color="#CD27D8"/>
+    </linearGradient>
+    <linearGradient id="gTeal" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#055F4E"/><stop offset="1" stop-color="#56C0A7"/>
+    </linearGradient>
+  </defs>
+
+  <!-- ======================= OUTER AWS CLOUD FRAME ======================= -->
+  <rect class="frame" x="20" y="15" width="2200" height="985"/>
+  <rect x="20" y="15" width="46" height="46" fill="#232F3E"/>
+  <text x="43" y="44" text-anchor="middle" font-size="15" font-weight="800" fill="#fff" font-style="italic">aws</text>
+  <text x="80" y="45" font-size="18" font-weight="700" fill="#232F3E">AWS Cloud</text>
+
+  <!-- ======================= FLOW LINES (under icons) ======================= -->
+  <path id="p1" class="flow" d="M 175 375 L 296 375"/>
+  <path id="p2" class="flow" d="M 384 375 L 561 375"/>
+  <path id="p3" class="flow" d="M 649 375 L 878 375"/>
+  <path id="p4" class="flow" d="M 922 421 L 922 576"/>
+  <path id="p5" class="flow" d="M 966 620 C 1080 620 1100 510 1206 505"/>
+  <path id="pECR" class="flow-dash" d="M 922 896 L 922 666"/>
+
+  <!-- fan-out connectors -->
+  <path id="pA" class="flow" d="M 1292 482 C 1345 450 1330 210 1380 210 L 1476 210"/>
+  <path id="pB" class="flow" d="M 1292 498 C 1340 480 1335 410 1380 410 L 1476 410"/>
+  <path id="pC" class="flow" d="M 1292 512 C 1340 530 1335 610 1380 610 L 1476 610"/>
+  <path id="pD" class="flow" d="M 1292 528 C 1345 560 1330 810 1380 810 L 1476 810"/>
+
+  <!-- lane internal arrows -->
+  <path class="flow" d="M 1564 210 L 1656 210"/>
+  <path class="flow" d="M 1744 210 L 1856 210"/>
+  <path class="flow" d="M 1564 410 L 1656 410"/>
+  <path class="flow" d="M 1744 410 L 1856 410"/>
+  <path class="flow" d="M 1564 610 L 1656 610"/>
+  <path class="flow" d="M 1744 610 L 1846 610"/>
+  <path class="flow" d="M 1934 610 L 1981 610"/>
+  <path class="flow" d="M 2069 610 L 2116 610"/>
+  <path class="flow" d="M 1564 810 L 1656 810"/>
+  <path class="flow" d="M 1744 810 L 1846 810"/>
+  <path class="flow" d="M 1934 810 L 2006 810"/>
+
+  <!-- hidden animation guide paths -->
+  <path id="gA" d="M 1292 482 C 1345 450 1330 210 1380 210 L 1520 210 L 1700 210 L 1900 210" fill="none" stroke="none"/>
+  <path id="gB" d="M 1292 498 C 1340 480 1335 410 1380 410 L 1520 410 L 1700 410 L 1900 410" fill="none" stroke="none"/>
+  <path id="gC" d="M 1292 512 C 1340 530 1335 610 1380 610 L 1520 610 L 1700 610 L 1890 610 L 2025 610 L 2160 610" fill="none" stroke="none"/>
+  <path id="gD" d="M 1292 528 C 1345 560 1330 810 1380 810 L 1520 810 L 1700 810 L 1890 810 L 2050 810" fill="none" stroke="none"/>
+
+  <!-- flow labels -->
+  <text class="flow-label" x="938" y="508">:3000</text>
+  <text class="flow-label" x="938" y="788">pulls image</text>
+  <text class="flow-label" x="1040" y="585">publishes order</text>
+
+  <!-- ======================= CLIENT (dark line art) ======================= -->
+  <g id="tBrowser" class="icon-g">
+    <g class="dark-glyph">
+      <rect x="102" y="331" width="56" height="38" rx="4"/>
+      <path d="M 102 341 H 158"/>
+      <path d="M 130 369 V 377"/>
+      <path d="M 118 379 H 142"/>
+    </g>
+    <text class="lbl" x="130" y="420" text-anchor="middle">Customer Browser</text>
+    <text class="sub2" x="130" y="443" text-anchor="middle">"Evangadi Coffee Shop"</text>
+  </g>
+
+  <!-- ======================= WAF ======================= -->
+  <g id="tWAF" class="icon-g">
+    <rect x="300" y="335" width="80" height="80" rx="10" fill="url(#gRed)"/>
+    <g class="glyph" transform="translate(300,335)">
+      <path d="M40 14 L63 23 V42 C63 56 53 63 40 67 C27 63 17 56 17 42 V23 Z"/>
+      <path d="M29 36 H51"/><path d="M29 45 H47"/>
+    </g>
+    <text class="lbl" x="340" y="445" text-anchor="middle">AWS WAF</text>
+    <text class="sub2" x="340" y="468" text-anchor="middle">managed rules · rate limit</text>
+    <text id="wafFlash" class="flash fl-green" x="340" y="320" text-anchor="middle">inspected ✓</text>
+  </g>
+
+  <!-- ======================= VPC ======================= -->
+  <rect class="vpc-box" x="520" y="150" width="640" height="700"/>
+  <rect x="520" y="150" width="40" height="40" fill="url(#gPurple)"/>
+  <g class="glyph" transform="translate(503,133) scale(0.55)"><path d="M40 26 C30 26 26 34 28 40 C22 40 18 46 22 52 H58 C64 52 66 44 60 41 C62 32 50 24 44 30"/></g>
+  <text class="vpc-lbl" x="572" y="176">VPC · us-west-2</text>
+
+  <!-- IGW -->
+  <g id="tIGW" class="icon-g">
+    <rect x="565" y="335" width="80" height="80" rx="10" fill="url(#gPurple)"/>
+    <g class="glyph" transform="translate(565,335)">
+      <path d="M24 32 H50"/><path d="M44 25 L52 32 L44 39"/>
+      <path d="M56 48 H30"/><path d="M36 41 L28 48 L36 55"/>
+    </g>
+    <text class="lbl" x="605" y="445" text-anchor="middle" font-size="16">Internet Gateway</text>
+  </g>
+
+  <!-- Subnets -->
+  <rect class="subnet" x="700" y="240" width="220" height="590"/>
+  <text class="subnet-lbl" x="712" y="266">Public subnet · us-west-2a</text>
+  <rect class="subnet" x="935" y="240" width="210" height="590"/>
+  <text class="subnet-lbl" x="947" y="266">Public subnet · us-west-2b</text>
+
+  <!-- ALB -->
+  <g id="tALB" class="icon-g">
+    <rect x="882" y="335" width="80" height="80" rx="10" fill="url(#gPurple)"/>
+    <g class="glyph" transform="translate(882,335)">
+      <path d="M14 40 H27"/>
+      <circle cx="38" cy="40" r="9"/>
+      <path d="M45 35 L57 24"/><path d="M47 40 H57"/><path d="M45 45 L57 56"/>
+      <circle cx="63" cy="22" r="5"/><circle cx="63" cy="40" r="5"/><circle cx="63" cy="58" r="5"/>
+    </g>
+    <text class="lbl" x="975" y="368" font-size="16">Load Balancer</text>
+    <text class="sub2" x="975" y="391">ALB · listener :80</text>
+  </g>
+
+  <!-- ECS Fargate -->
+  <g id="tECS" class="icon-g">
+    <rect x="882" y="580" width="80" height="80" rx="10" fill="url(#gOrange)"/>
+    <g class="glyph" transform="translate(882,580)">
+      <path d="M40 16 L62 27 V49 L40 60 L18 49 V27 Z"/>
+      <path d="M18 27 L40 38 L62 27"/>
+      <path d="M40 38 V60"/>
+    </g>
+    <text class="lbl" x="975" y="608" font-size="16">ECS on Fargate</text>
+    <text class="sub2" x="975" y="631">coffee-api · :3000</text>
+  </g>
+
+  <!-- ======================= ECR (outside VPC) ======================= -->
+  <g id="tECR" class="icon-g">
+    <rect x="882" y="900" width="80" height="80" rx="10" fill="url(#gOrange)"/>
+    <g class="glyph" transform="translate(882,900)">
+      <rect x="16" y="20" width="48" height="44" rx="4"/>
+      <path d="M40 30 L52 36 V46 L40 52 L28 46 V36 Z"/>
+      <path d="M28 36 L40 42 L52 36"/><path d="M40 42 V52"/>
+    </g>
+    <text class="lbl" x="975" y="932" font-size="16">Amazon ECR</text>
+    <text class="sub2" x="975" y="955">container image</text>
+  </g>
+
+  <!-- ======================= SNS HUB ======================= -->
+  <g id="tSNS" class="icon-g">
+    <rect x="1210" y="465" width="80" height="80" rx="10" fill="url(#gPink)"/>
+    <g class="glyph" transform="translate(1210,465)">
+      <circle cx="26" cy="40" r="7"/>
+      <path d="M32 36 L51 24"/><path d="M33 40 H51"/><path d="M32 44 L51 56"/>
+      <circle cx="56" cy="24" r="4"/><circle cx="56" cy="40" r="4"/><circle cx="56" cy="56" r="4"/>
+    </g>
+    <text class="lbl" x="1250" y="572" text-anchor="middle" font-size="16">Amazon SNS</text>
+    <text class="sub2" x="1250" y="595" text-anchor="middle">coffee-shop-orders</text>
+    <text id="snsFlash" class="flash fl-orange" x="1250" y="450" text-anchor="middle">published ✓</text>
+  </g>
+
+  <!-- ======================= HEADLINE ======================= -->
+  <text class="headline" x="1815" y="56" text-anchor="middle">"One order event → four independent reactions.</text>
+  <text class="headline" x="1815" y="90" text-anchor="middle">None of them knows the others exist."</text>
+
+  <!-- ======================= PATH A — PERSISTENCE ======================= -->
+  <text class="lane-title" x="1450" y="132">PATH A — PERSISTENCE</text>
+  <g id="tSqsA" class="icon-g">
+    <rect x="1480" y="170" width="80" height="80" rx="10" fill="url(#gPink)"/>
+    <g class="glyph" transform="translate(1480,170)">
+      <rect x="18" y="30" width="12" height="16"/><rect x="34" y="30" width="12" height="16"/><rect x="50" y="30" width="12" height="16"/>
+      <path d="M22 58 H52"/><path d="M48 53 L56 58 L48 63"/>
+    </g>
+    <text class="lbl" x="1520" y="274" text-anchor="middle" font-size="16">SQS</text>
+    <text class="sub2" x="1520" y="296" text-anchor="middle">process queue</text>
+  </g>
+  <g id="tLamA" class="icon-g">
+    <rect x="1660" y="170" width="80" height="80" rx="10" fill="url(#gOrange)"/>
+    <text x="1700" y="225" text-anchor="middle" font-size="42" font-weight="700" fill="#fff">λ</text>
+    <text class="lbl" x="1700" y="274" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="sub2" x="1700" y="296" text-anchor="middle">processor</text>
+  </g>
+  <g id="tDestA" class="icon-g">
+    <rect x="1860" y="170" width="80" height="80" rx="10" fill="url(#gMagenta)"/>
+    <g class="glyph" transform="translate(1860,170)">
+      <ellipse cx="40" cy="24" rx="19" ry="7"/>
+      <path d="M21 24 V54"/><path d="M59 24 V54"/>
+      <path d="M21 54 C21 58 30 61 40 61 C50 61 59 58 59 54"/>
+      <path d="M45 30 L34 46 H41 L36 60 L50 42 H43 L48 30 Z" fill="#fff" stroke="none"/>
+    </g>
+    <text class="lbl" x="1900" y="274" text-anchor="middle" font-size="16">DynamoDB</text>
+    <text class="sub2" x="1900" y="296" text-anchor="middle">orders table</text>
+  </g>
+
+  <!-- ======================= PATH B — MONITORING ======================= -->
+  <text class="lane-title" x="1450" y="332">PATH B — MONITORING</text>
+  <g id="tSqsB" class="icon-g">
+    <rect x="1480" y="370" width="80" height="80" rx="10" fill="url(#gPink)"/>
+    <g class="glyph" transform="translate(1480,370)">
+      <rect x="18" y="30" width="12" height="16"/><rect x="34" y="30" width="12" height="16"/><rect x="50" y="30" width="12" height="16"/>
+      <path d="M22 58 H52"/><path d="M48 53 L56 58 L48 63"/>
+    </g>
+    <text class="lbl" x="1520" y="474" text-anchor="middle" font-size="16">SQS</text>
+    <text class="sub2" x="1520" y="496" text-anchor="middle">analytics queue</text>
+  </g>
+  <g id="tLamB" class="icon-g">
+    <rect x="1660" y="370" width="80" height="80" rx="10" fill="url(#gOrange)"/>
+    <text x="1700" y="425" text-anchor="middle" font-size="42" font-weight="700" fill="#fff">λ</text>
+    <text class="lbl" x="1700" y="474" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="sub2" x="1700" y="496" text-anchor="middle">analytics</text>
+  </g>
+  <g id="tDestB" class="icon-g">
+    <rect x="1860" y="370" width="80" height="80" rx="10" fill="url(#gPink)"/>
+    <g class="glyph" transform="translate(1860,370)">
+      <circle cx="40" cy="42" r="19"/>
+      <path d="M40 42 L51 32"/>
+      <path d="M40 25 V29"/><path d="M57 42 H53"/><path d="M40 59 V55"/><path d="M23 42 H27"/>
+    </g>
+    <text class="lbl" x="1900" y="474" text-anchor="middle" font-size="16">CloudWatch</text>
+    <text class="sub2" x="1900" y="496" text-anchor="middle">metrics + dashboard</text>
+  </g>
+
+  <!-- ======================= PATH C — ANALYTICS ======================= -->
+  <text class="lane-title" x="1450" y="532">PATH C — ANALYTICS</text>
+  <g id="tSqsC" class="icon-g">
+    <rect x="1480" y="570" width="80" height="80" rx="10" fill="url(#gPink)"/>
+    <g class="glyph" transform="translate(1480,570)">
+      <rect x="18" y="30" width="12" height="16"/><rect x="34" y="30" width="12" height="16"/><rect x="50" y="30" width="12" height="16"/>
+      <path d="M22 58 H52"/><path d="M48 53 L56 58 L48 63"/>
+    </g>
+    <text class="lbl" x="1520" y="674" text-anchor="middle" font-size="16">SQS</text>
+    <text class="sub2" x="1520" y="696" text-anchor="middle">S3 queue</text>
+  </g>
+  <g id="tLamC" class="icon-g">
+    <rect x="1660" y="570" width="80" height="80" rx="10" fill="url(#gOrange)"/>
+    <text x="1700" y="625" text-anchor="middle" font-size="42" font-weight="700" fill="#fff">λ</text>
+    <text class="lbl" x="1700" y="674" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="sub2" x="1700" y="696" text-anchor="middle">s3-writer</text>
+  </g>
+  <g id="tS3C" class="icon-g">
+    <rect x="1850" y="570" width="80" height="80" rx="10" fill="url(#gGreen)"/>
+    <g class="glyph" transform="translate(1850,570)">
+      <ellipse cx="40" cy="24" rx="17" ry="6"/>
+      <path d="M23 24 L28 58 C30 63 50 63 52 58 L57 24"/>
+      <path d="M27 38 C31 42 49 42 53 38"/>
+    </g>
+    <text class="lbl" x="1890" y="674" text-anchor="middle" font-size="16">S3</text>
+    <text class="sub2" x="1890" y="696" text-anchor="middle">raw orders</text>
+  </g>
+  <g id="tGlueC" class="icon-g">
+    <rect x="1985" y="570" width="80" height="80" rx="10" fill="url(#gPurple)"/>
+    <g class="glyph" transform="translate(1985,570)">
+      <circle cx="27" cy="30" r="6"/><circle cx="53" cy="50" r="6"/>
+      <path d="M31 35 C38 42 42 38 49 45"/>
+      <circle cx="53" cy="26" r="4"/>
+    </g>
+    <text class="lbl" x="2025" y="674" text-anchor="middle" font-size="16">Glue</text>
+    <text class="sub2" x="2025" y="696" text-anchor="middle">catalog</text>
+  </g>
+  <g id="tAthC" class="icon-g">
+    <rect x="2120" y="570" width="80" height="80" rx="10" fill="url(#gPurple)"/>
+    <g class="glyph" transform="translate(2120,570)">
+      <circle cx="35" cy="35" r="13"/>
+      <path d="M44 44 L60 60"/>
+    </g>
+    <text class="lbl" x="2160" y="674" text-anchor="middle" font-size="16">Athena</text>
+    <text class="sub2" x="2160" y="696" text-anchor="middle">SQL queries</text>
+  </g>
+
+  <!-- ======================= PATH D — AI RECOMMENDER ======================= -->
+  <text class="lane-title" x="1450" y="732">PATH D — AI RECOMMENDER</text>
+  <g id="tSqsD" class="icon-g">
+    <rect x="1480" y="770" width="80" height="80" rx="10" fill="url(#gPink)"/>
+    <g class="glyph" transform="translate(1480,770)">
+      <rect x="18" y="30" width="12" height="16"/><rect x="34" y="30" width="12" height="16"/><rect x="50" y="30" width="12" height="16"/>
+      <path d="M22 58 H52"/><path d="M48 53 L56 58 L48 63"/>
+    </g>
+    <text class="lbl" x="1520" y="874" text-anchor="middle" font-size="16">SQS</text>
+    <text class="sub2" x="1520" y="896" text-anchor="middle">recommendation queue</text>
+  </g>
+  <g id="tLamD" class="icon-g">
+    <rect x="1660" y="770" width="80" height="80" rx="10" fill="url(#gOrange)"/>
+    <text x="1700" y="825" text-anchor="middle" font-size="42" font-weight="700" fill="#fff">λ</text>
+    <text class="lbl" x="1700" y="874" text-anchor="middle" font-size="16">Lambda</text>
+    <text class="sub2" x="1700" y="896" text-anchor="middle">recommender</text>
+  </g>
+  <g id="tBedD" class="icon-g">
+    <rect x="1850" y="770" width="80" height="80" rx="10" fill="url(#gTeal)"/>
+    <g class="glyph" transform="translate(1850,770)">
+      <circle cx="40" cy="30" r="7"/>
+      <path d="M35 36 L28 48"/><path d="M45 36 L52 48"/>
+      <circle cx="26" cy="52" r="5"/><circle cx="54" cy="52" r="5"/>
+      <path d="M31 52 H49"/>
+    </g>
+    <text class="lbl" x="1890" y="874" text-anchor="middle" font-size="16">Bedrock</text>
+    <text class="sub2" x="1890" y="896" text-anchor="middle">Claude</text>
+  </g>
+  <g id="tDdbD" class="icon-g">
+    <rect x="2010" y="770" width="80" height="80" rx="10" fill="url(#gMagenta)"/>
+    <g class="glyph" transform="translate(2010,770)">
+      <ellipse cx="40" cy="24" rx="19" ry="7"/>
+      <path d="M21 24 V54"/><path d="M59 24 V54"/>
+      <path d="M21 54 C21 58 30 61 40 61 C50 61 59 58 59 54"/>
+      <path d="M45 30 L34 46 H41 L36 60 L50 42 H43 L48 30 Z" fill="#fff" stroke="none"/>
+    </g>
+    <text class="lbl" x="2050" y="874" text-anchor="middle" font-size="16">DynamoDB</text>
+    <text class="sub2" x="2050" y="896" text-anchor="middle">recommendations</text>
+  </g>
+
+  <!-- ======================= STEP BADGES ======================= -->
+  <g><circle class="step" cx="235" cy="375" r="16"/><text class="step-n" x="235" y="381" text-anchor="middle">1</text></g>
+  <g><circle class="step" cx="763" cy="375" r="16"/><text class="step-n" x="763" y="381" text-anchor="middle">2</text></g>
+  <g><circle class="step" cx="922" cy="498" r="16"/><text class="step-n" x="922" y="504" text-anchor="middle">3</text></g>
+  <g><circle class="step" cx="1090" cy="556" r="16"/><text class="step-n" x="1090" y="562" text-anchor="middle">4</text></g>
+  <g><circle class="step" cx="1330" cy="505" r="16"/><text class="step-n" x="1330" y="511" text-anchor="middle">5</text></g>
+
+  <!-- ======================= NOTES ======================= -->
+  <text class="note" x="44" y="958">Region us-west-2 · Bedrock invoked in us-east-1 · CloudWatch Logs on all Lambdas</text>
+
+  <!-- ======================= ANIMATION LAYER ======================= -->
+  <text id="caption" x="1815" y="960" text-anchor="middle">One event → four reactions, in parallel.</text>
+  <g id="pulseLayer"></g>
+</svg>
+</main>
+
+<script>
+(function(){
+  const svgns = "http://www.w3.org/2000/svg";
+  const $ = id => document.getElementById(id);
+  const pulseLayer = $("pulseLayer");
+  const playBtn = $("playBtn"), resetBtn = $("resetBtn");
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let playing = false;
+
+  const LANES = [
+    {guide:"gA", cls:"lit-A", color:"#C925D1", dests:["tDestA"]},
+    {guide:"gB", cls:"lit-B", color:"#E7157B", dests:["tDestB"]},
+    {guide:"gC", cls:"lit-C", color:"#6CAE3E", dests:["tS3C","tGlueC","tAthC"]},
+    {guide:"gD", cls:"lit-D", color:"#01A88D", dests:["tBedD","tDdbD"]}
+  ];
+
+  function makePulse(color){
+    const g = document.createElementNS(svgns,"g");
+    const glow = document.createElementNS(svgns,"circle");
+    glow.setAttribute("r","16"); glow.setAttribute("fill",color); glow.setAttribute("opacity","0.4");
+    const core = document.createElementNS(svgns,"circle");
+    core.setAttribute("r","7"); core.setAttribute("fill","#fff");
+    core.setAttribute("stroke",color); core.setAttribute("stroke-width","3");
+    g.appendChild(glow); g.appendChild(core);
+    pulseLayer.appendChild(g);
+    return g;
+  }
+
+  function travel(pulse, path, duration){
+    return new Promise(resolve=>{
+      const len = path.getTotalLength();
+      const start = performance.now();
+      function frame(now){
+        let t = Math.min((now - start)/duration, 1);
+        const e = t<.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2; // ease in-out
+        const pt = path.getPointAtLength(e*len);
+        pulse.setAttribute("transform", "translate("+pt.x+","+pt.y+")");
+        if(t < 1) requestAnimationFrame(frame); else resolve();
+      }
+      requestAnimationFrame(frame);
+    });
+  }
+
+  function flash(id, ms){
+    const el = $(id); el.classList.add("on");
+    setTimeout(()=>el.classList.remove("on"), ms);
+  }
+
+  function lightUp(lane){
+    lane.dests.forEach((d,i)=>{
+      setTimeout(()=> $(d).classList.add(lane.cls), i*180);
+    });
+  }
+
+  function clearAll(){
+    pulseLayer.innerHTML = "";
+    $("caption").classList.remove("on");
+    $("wafFlash").classList.remove("on");
+    $("snsFlash").classList.remove("on");
+    LANES.forEach(l => l.dests.forEach(d => $(d).classList.remove(l.cls)));
+  }
+
+  async function play(){
+    if(playing) return;
+    playing = true; playBtn.disabled = true;
+    clearAll();
+
+    if(reduced){
+      flash("wafFlash", 4000); flash("snsFlash", 4000);
+      LANES.forEach(l => lightUp(l));
+      $("caption").classList.add("on");
+      playing = false; playBtn.disabled = false;
+      return;
+    }
+
+    const pulse = makePulse("#FF9900");
+
+    await travel(pulse, $("p1"), 420);          // browser -> WAF
+    flash("wafFlash", 1200);
+    await travel(pulse, $("p2"), 420);          // WAF -> IGW
+    await travel(pulse, $("p3"), 360);          // IGW -> ALB
+    await travel(pulse, $("p4"), 420);          // ALB -> Fargate
+    await travel(pulse, $("p5"), 520);          // Fargate -> SNS
+    flash("snsFlash", 1400);
+    pulse.remove();
+
+    await new Promise(r=>setTimeout(r,180));
+
+    const runs = LANES.map(lane=>{
+      const p = makePulse(lane.color);
+      return travel(p, $(lane.guide), 1900).then(()=>{
+        lightUp(lane);
+        p.remove();
+      });
+    });
+    await Promise.all(runs);
+
+    $("caption").classList.add("on");
+    playing = false; playBtn.disabled = false;
+  }
+
+  playBtn.addEventListener("click", play);
+  resetBtn.addEventListener("click", ()=>{ if(!playing) clearAll(); });
+})();
+</script>
+</body>
+</html>
