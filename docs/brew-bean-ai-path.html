@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Evangadi &amp; Coffee Shop — AI Recommendation Path</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#17110d;
+    --panel:#20180f;
+    --panel-2:#271d12;
+    --line:#3a2c1c;
+    --cream:#F3E9DC;
+    --mid:#B9A88f;
+    --faint:#7d6c57;
+
+    /* Sync track — the order (crema / amber) */
+    --sync:#E8A35C;
+    --sync-bright:#F6BE82;
+    --sync-deep:#3a2616;
+
+    /* Async track — the AI (steam / teal) */
+    --async:#54D6C6;
+    --async-bright:#8DEFE2;
+    --async-deep:#143430;
+
+    --ai:#B79CFF;     /* bedrock category */
+    --node:#2a2014;
+    --node-hi:#37281a;
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 600px at 78% -10%, rgba(84,214,198,.07), transparent 60%),
+      radial-gradient(1000px 520px at 10% -5%, rgba(232,163,92,.08), transparent 55%),
+      var(--bg);
+    color:var(--cream);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding:24px 18px 36px;
+  }
+  .wrap{max-width:1000px;margin:0 auto}
+
+  /* ---------- header ---------- */
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:14px}
+  .brand{display:flex;flex-direction:column;gap:4px}
+  .kicker{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--sync)}
+  h1{font-size:26px;font-weight:600;margin:0;letter-spacing:-.01em}
+  h1 b{color:var(--async);font-weight:600}
+  .order-chip{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--mid);
+    border:1px solid var(--line);background:var(--panel);border-radius:999px;
+    padding:7px 14px;white-space:nowrap;
+  }
+  .order-chip span{color:var(--cream)}
+
+  /* ---------- legend ---------- */
+  .legend{display:flex;gap:22px;flex-wrap:wrap;margin:6px 0 14px;font-size:12.5px;color:var(--mid)}
+  .legend .item{display:flex;align-items:center;gap:8px}
+  .swatch{width:26px;height:6px;border-radius:3px}
+  .swatch.sync{background:linear-gradient(90deg,var(--sync),var(--sync-bright))}
+  .swatch.async{background:linear-gradient(90deg,var(--async),var(--async-bright));
+    background-image:repeating-linear-gradient(90deg,var(--async) 0 6px,transparent 6px 10px)}
+  .legend b{color:var(--cream);font-weight:600}
+
+  /* ---------- stage ---------- */
+  .stage{
+    position:relative;border:1px solid var(--line);border-radius:18px;
+    background:linear-gradient(180deg,#1d160e,#191209);
+    padding:8px 8px 0;overflow:hidden;
+  }
+  svg{display:block;width:100%;height:auto}
+
+  /* nodes */
+  .node rect.box{fill:var(--node);stroke:var(--line);stroke-width:1.5;transition:fill .3s,stroke .3s}
+  .node .accent{transition:opacity .3s}
+  .node .n-title{fill:var(--cream);font-family:"IBM Plex Sans";font-weight:600;font-size:17px;text-anchor:middle}
+  .node .n-sub{fill:var(--faint);font-family:"IBM Plex Mono";font-size:12px;text-anchor:middle;transition:fill .3s}
+  .node .n-icon{font-size:20px;text-anchor:middle}
+  .node{opacity:.62;transition:opacity .35s}
+  .node.active{opacity:1}
+  .node.active rect.box{fill:var(--node-hi);stroke:var(--cream);stroke-width:2}
+  .node.active .n-sub{fill:var(--mid)}
+  .node.active.sync rect.box{stroke:var(--sync-bright)}
+  .node.active.async rect.box{stroke:var(--async-bright)}
+
+  /* edges */
+  .edge{fill:none;stroke:var(--line);stroke-width:2;transition:stroke .3s,stroke-width .3s,opacity .3s;opacity:.55}
+  .edge.dash{stroke-dasharray:5 7}
+  .edge.hot{opacity:1;stroke-width:3}
+  .edge.hot.sync{stroke:var(--sync)}
+  .edge.hot.async{stroke:var(--async)}
+  .arrowhead{fill:var(--line);transition:fill .3s,opacity .3s;opacity:.55}
+  .arrowhead.hot{opacity:1}
+  .arrowhead.hot.sync{fill:var(--sync)}
+  .arrowhead.hot.async{fill:var(--async)}
+
+  /* edge labels */
+  .elbl{font-family:"IBM Plex Mono";font-size:11px;fill:var(--faint);opacity:.0;transition:opacity .3s;text-anchor:middle}
+  .elbl.show{opacity:1}
+  .elbl.sync{fill:var(--sync)}
+  .elbl.async{fill:var(--async)}
+
+  /* recommendation box inside browser */
+  #recBox{fill:var(--sync-deep);stroke:var(--sync);stroke-width:1.2;opacity:.35;transition:opacity .4s}
+  #recBox.filled{opacity:1}
+  #recText{font-family:"IBM Plex Sans";font-size:11px;font-weight:500;fill:var(--sync-bright);text-anchor:middle;opacity:0;transition:opacity .5s}
+  #recText.filled{opacity:1}
+  #recPlaceholder{font-family:"IBM Plex Mono";font-size:10px;fill:var(--faint);text-anchor:middle;transition:opacity .3s}
+  #recPlaceholder.hide{opacity:0}
+
+  /* poll badge */
+  #pollBadge{opacity:0;transition:opacity .35s}
+  #pollBadge.show{opacity:1}
+  #pollBadge .pb-bg{fill:var(--async-deep);stroke:var(--async);stroke-width:1.2}
+  #pollBadge text{font-family:"IBM Plex Mono";font-size:11px;fill:var(--async-bright);text-anchor:middle}
+  #pollBadge.show .pb-ring{animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* timing badges */
+  .timing{opacity:0;transition:opacity .4s}
+  .timing.show{opacity:1}
+  .timing rect{rx:8}
+  .timing .t-label{font-family:"IBM Plex Mono";font-size:11px;text-anchor:middle}
+  #timeSync rect{fill:var(--sync-deep);stroke:var(--sync)}
+  #timeSync .t-label{fill:var(--sync-bright)}
+  #timeAsync rect{fill:var(--async-deep);stroke:var(--async)}
+  #timeAsync .t-label{fill:var(--async-bright)}
+
+  /* token */
+  #token{filter:url(#glow)}
+  .token-sync{fill:var(--sync-bright)}
+  .token-async{fill:var(--async-bright)}
+
+  /* ---------- narration ---------- */
+  .narration{
+    margin-top:14px;border:1px solid var(--line);border-radius:14px;
+    background:var(--panel);padding:16px 18px;display:flex;gap:16px;align-items:flex-start;
+    min-height:96px;
+  }
+  .step-num{
+    flex:0 0 auto;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;
+    font-family:"IBM Plex Mono";font-weight:600;font-size:19px;
+    border:1.5px solid var(--sync);color:var(--sync);background:var(--sync-deep);
+    transition:all .3s;
+  }
+  .narration.async .step-num{border-color:var(--async);color:var(--async);background:var(--async-deep)}
+  .n-body{flex:1;min-width:0}
+  .n-tag{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.06em;color:var(--sync);text-transform:uppercase;margin-bottom:5px}
+  .narration.async .n-tag{color:var(--async)}
+  .n-text{font-size:15.5px;line-height:1.5;color:var(--cream)}
+
+  /* ---------- controls ---------- */
+  .controls{display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap}
+  button.ctrl{
+    font-family:"IBM Plex Sans";font-size:14px;font-weight:500;color:var(--cream);
+    background:var(--panel-2);border:1px solid var(--line);border-radius:10px;
+    padding:9px 16px;cursor:pointer;transition:background .2s,border-color .2s,transform .05s;
+  }
+  button.ctrl:hover{background:var(--node-hi);border-color:var(--faint)}
+  button.ctrl:active{transform:translateY(1px)}
+  button.ctrl:disabled{opacity:.35;cursor:not-allowed}
+  button.primary{background:var(--sync);color:#241606;border-color:var(--sync)}
+  button.primary:hover{background:var(--sync-bright);border-color:var(--sync-bright)}
+  button.ctrl:focus-visible{outline:2px solid var(--async-bright);outline-offset:2px}
+  .spacer{flex:1}
+  .dots{display:flex;gap:8px}
+  .dot{
+    width:26px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--panel);
+    color:var(--faint);font-family:"IBM Plex Mono";font-size:12px;cursor:pointer;display:grid;place-items:center;
+    transition:all .2s;
+  }
+  .dot:hover{border-color:var(--faint)}
+  .dot.done{color:var(--mid)}
+  .dot.cur{background:var(--cream);color:#241606;border-color:var(--cream);font-weight:600}
+  .hint{font-family:"IBM Plex Mono";font-size:11px;color:var(--faint);margin-top:4px}
+
+  /* ---------- key idea footer ---------- */
+  .keyidea{
+    margin-top:16px;border-radius:14px;padding:16px 18px;
+    border:1px solid var(--line);background:linear-gradient(110deg,var(--sync-deep),var(--async-deep));
+    opacity:.55;transition:opacity .5s,border-color .5s;
+  }
+  .keyidea.lit{opacity:1;border-color:var(--async)}
+  .keyidea .ki-label{font-family:"IBM Plex Mono";font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--cream);opacity:.8;margin-bottom:6px}
+  .keyidea p{margin:0;font-size:15px;line-height:1.55}
+  .keyidea .amber{color:var(--sync-bright);font-weight:600}
+  .keyidea .teal{color:var(--async-bright);font-weight:600}
+
+  @media (max-width:560px){
+    h1{font-size:21px}
+    .n-text{font-size:14px}
+    .controls{gap:8px}
+    button.ctrl{padding:8px 12px;font-size:13px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #pollBadge.show .pb-ring{animation:none}
+    *{transition-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="kicker">Brew &amp; Bean · Path D</div>
+      <h1>The AI Recommendation <b>flow</b></h1>
+    </div>
+    <div class="order-chip">Sample order · <span>Fatu</span> · <span>small latte</span> ☕</div>
+  </header>
+
+  <div class="legend">
+    <div class="item"><span class="swatch sync"></span><span><b>Order conversation</b> — returns instantly</span></div>
+    <div class="item"><span class="swatch async"></span><span><b>AI conversation</b> — runs in the background, browser checks back</span></div>
+  </div>
+
+  <div class="stage">
+    <svg viewBox="0 0 1080 660" role="img" aria-label="Animated diagram of the Brew and Bean AI recommendation flow">
+      <defs>
+        <filter id="glow" x="-80%" y="-80%" width="260%" height="260%">
+          <feGaussianBlur stdDeviation="5" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+        <marker id="ah" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
+          <path d="M0,0 L6,3 L0,6 Z" class="mk"/>
+        </marker>
+      </defs>
+
+      <!-- ===================== EDGES ===================== -->
+      <!-- sync -->
+      <path id="e1" class="edge sync" d="M236,130 L424,130"/>
+      <path id="e2" class="edge sync" d="M612,130 L824,130"/>
+      <path id="e3" class="edge sync" d="M520,84 C520,26 140,26 140,68"/>
+      <!-- async -->
+      <path id="e4" class="edge async" d="M905,178 L905,319"/>
+      <path id="e5" class="edge async" d="M818,375 L702,375"/>
+      <path id="e6" class="edge async dash" d="M905,427 L905,521"/>
+      <path id="e7" class="edge async" d="M876,425 C796,500 700,544 626,554"/>
+      <path id="e8" class="edge async dash" d="M520,178 L520,521"/>
+      <path id="e9" class="edge async dash" d="M150,191 C250,330 460,300 512,180"/>
+
+      <!-- arrowheads (static, recolor on hot) -->
+      <g id="heads">
+        <path data-h="e1" class="arrowhead sync" d="M424,130 l-11,-5 l0,10 Z"/>
+        <path data-h="e2" class="arrowhead sync" d="M824,130 l-11,-5 l0,10 Z"/>
+        <path data-h="e3" class="arrowhead sync" d="M140,68 l5,11 l-10,0 Z"/>
+        <path data-h="e4" class="arrowhead async" d="M905,319 l-5,-11 l10,0 Z"/>
+        <path data-h="e5" class="arrowhead async" d="M702,375 l11,-5 l0,10 Z"/>
+        <path data-h="e6" class="arrowhead async" d="M905,427 l-5,11 l10,0 Z"/>
+        <path data-h="e7" class="arrowhead async" d="M626,554 l12,-2 l-7,-8 Z"/>
+        <path data-h="e8" class="arrowhead async" d="M520,521 l-5,-11 l10,0 Z"/>
+        <path data-h="e9" class="arrowhead async" d="M512,180 l-2,-12 l-9,6 Z"/>
+      </g>
+
+      <!-- edge labels -->
+      <text id="l-e2" class="elbl sync" x="718" y="116">sns.send</text>
+      <text id="l-e3" class="elbl sync" x="330" y="20">instant reply</text>
+      <text id="l-e9" class="elbl async" x="300" y="300">poll · GET /recommendation</text>
+      <text id="l-e8" class="elbl async" x="556" y="360">GetCommand</text>
+      <text id="l-e5" class="elbl async" x="760" y="365">bedrock.send</text>
+      <text id="l-e6" class="elbl async" x="952" y="478">read history</text>
+      <text id="l-e7" class="elbl async" x="742" y="528">save</text>
+
+      <!-- ===================== NODES ===================== -->
+      <!-- Browser -->
+      <g class="node sync" id="n-browser">
+        <rect class="box" x="45" y="70" width="190" height="124" rx="14"/>
+        <rect class="accent" x="45" y="70" width="5" height="124" rx="2.5" fill="var(--cream)"/>
+        <text class="n-icon" x="140" y="98">🖥️</text>
+        <text class="n-title" x="140" y="120">Browser</text>
+        <text class="n-sub" x="140" y="138">index.html</text>
+        <rect id="recBox" x="60" y="150" width="160" height="32" rx="7"/>
+        <text id="recPlaceholder" x="140" y="170">suggestion appears here</text>
+        <text id="recText" x="140" y="170">Try a cappuccino today ☕</text>
+      </g>
+      <!-- poll badge above browser -->
+      <g id="pollBadge" transform="translate(140,52)">
+        <rect class="pb-bg" x="-52" y="-15" width="104" height="26" rx="13"/>
+        <g class="pb-ring" transform="translate(-36,-2)">
+          <path d="M0,-7 A7,7 0 1 1 -6,4" fill="none" stroke="var(--async-bright)" stroke-width="2" stroke-linecap="round"/>
+          <path d="M-6,4 l-3,-1 l1,4 Z" fill="var(--async-bright)"/>
+        </g>
+        <text x="6" y="3">poll · 1s</text>
+      </g>
+
+      <!-- API -->
+      <g class="node sync" id="n-api">
+        <rect class="box" x="430" y="82" width="180" height="96" rx="14"/>
+        <rect class="accent" x="430" y="82" width="5" height="96" rx="2.5" fill="var(--sync)"/>
+        <text class="n-icon" x="520" y="112">⚙️</text>
+        <text class="n-title" x="520" y="134">API</text>
+        <text class="n-sub" x="520" y="153">server.mjs</text>
+      </g>
+
+      <!-- SNS -->
+      <g class="node sync" id="n-sns">
+        <rect class="box" x="830" y="82" width="150" height="96" rx="14"/>
+        <rect class="accent" x="830" y="82" width="5" height="96" rx="2.5" fill="#EF9A6A"/>
+        <text class="n-icon" x="905" y="112">📣</text>
+        <text class="n-title" x="905" y="134">SNS</text>
+        <text class="n-sub" x="905" y="153">announce</text>
+      </g>
+
+      <!-- Recommender -->
+      <g class="node async" id="n-rec">
+        <rect class="box" x="820" y="319" width="170" height="108" rx="14"/>
+        <rect class="accent" x="820" y="319" width="5" height="108" rx="2.5" fill="var(--async)"/>
+        <text class="n-icon" x="905" y="352">🤖</text>
+        <text class="n-title" x="905" y="375">Recommender</text>
+        <text class="n-sub" x="905" y="394">index.mjs</text>
+      </g>
+
+      <!-- Bedrock -->
+      <g class="node async" id="n-bedrock">
+        <rect class="box" x="540" y="327" width="162" height="92" rx="14"/>
+        <rect class="accent" x="540" y="327" width="5" height="92" rx="2.5" fill="var(--ai)"/>
+        <text class="n-icon" x="621" y="357">🧠</text>
+        <text class="n-title" x="621" y="379">Bedrock</text>
+        <text class="n-sub" x="621" y="398">AI model</text>
+      </g>
+
+      <!-- coffee-orders -->
+      <g class="node async" id="n-orders">
+        <rect class="box" x="818" y="521" width="174" height="74" rx="12"/>
+        <rect class="accent" x="818" y="521" width="5" height="74" rx="2.5" fill="var(--async)"/>
+        <text class="n-icon" x="905" y="548">🗄️</text>
+        <text class="n-title" x="905" y="566" style="font-size:14px">coffee-orders</text>
+        <text class="n-sub" x="905" y="582" style="font-size:11px">Fatu's history</text>
+      </g>
+
+      <!-- coffee-recommendations -->
+      <g class="node async" id="n-recs">
+        <rect class="box" x="420" y="521" width="200" height="74" rx="12"/>
+        <rect class="accent" x="420" y="521" width="5" height="74" rx="2.5" fill="var(--async)"/>
+        <text class="n-icon" x="520" y="548">🗄️</text>
+        <text class="n-title" x="520" y="566" style="font-size:13px">coffee-recommendations</text>
+        <text class="n-sub" x="520" y="582" style="font-size:11px">the suggestion</text>
+      </g>
+
+      <!-- timing badges -->
+      <g id="timeSync" class="timing" transform="translate(330,52)">
+        <rect x="-58" y="-14" width="116" height="26"/>
+        <text class="t-label" x="0" y="4">order → ~50 ms</text>
+      </g>
+      <g id="timeAsync" class="timing" transform="translate(520,612)">
+        <rect x="-60" y="-13" width="120" height="26"/>
+        <text class="t-label" x="0" y="4">AI ready → ~2.3 s</text>
+      </g>
+
+      <!-- token -->
+      <circle id="token" r="7" cx="-50" cy="-50" class="token-sync" opacity="0"/>
+    </svg>
+  </div>
+
+  <div class="narration" id="narration">
+    <div class="step-num" id="stepNum">1</div>
+    <div class="n-body">
+      <div class="n-tag" id="nTag">Browser → API</div>
+      <div class="n-text" id="nText">Fatu clicks <b>Place Order</b>. The click handler reads customer, item, size and POSTs them to the API.</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl" id="prevBtn">← Prev</button>
+    <button class="ctrl primary" id="playBtn">▶ Play</button>
+    <button class="ctrl" id="nextBtn">Next →</button>
+    <button class="ctrl" id="resetBtn">↺ Reset</button>
+    <div class="spacer"></div>
+    <div class="dots" id="dots"></div>
+  </div>
+  <div class="hint">Walk it with ← / → · Space plays · R resets</div>
+
+  <div class="keyidea" id="keyidea">
+    <div class="ki-label">The one idea to land</div>
+    <p>Placing the order and getting the AI suggestion are <span class="amber">two separate conversations</span>. The order returns immediately so the customer never waits; the <span class="teal">AI works in the background</span> and the browser politely checks back until it's ready. That separation is the whole reason the app feels instant — even though the AI takes a couple of seconds.</p>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const STEPS = [
+    { track:'sync',  tag:'Browser → API',
+      text:'Fatu clicks <b>Place Order</b>. The click handler reads <code>customer="Fatu"</code>, <code>item="latte"</code>, <code>size="small"</code> and <code>fetch</code>-POSTs them to the API.',
+      token:'M236,130 L424,130', nodes:['browser','api'], edges:['e1'], labels:[] },
+
+    { track:'sync',  tag:'API · sns.send',
+      text:'The API builds the <code>order</code> with a fresh <code>orderId</code> + <code>timestamp</code>, announces it on SNS, and replies <code>{ status, orderId }</code>.',
+      token:'M612,130 L824,130', nodes:['api','sns'], edges:['e2'], labels:['l-e2'] },
+
+    { track:'sync',  tag:'API → Browser · instant',
+      text:'Browser sees <code>res.ok</code>, shows <b>“✅ Order received…”</b>, and starts polling <code>GET /recommendation?customer=Fatu</code> once every second.',
+      token:'M520,84 C520,26 140,26 140,68', nodes:['api','browser'], edges:['e3'], labels:['l-e3'],
+      poll:true, timeSync:true },
+
+    { track:'async', tag:'SNS → Recommender → Bedrock',
+      text:'The announcement wakes the Recommender. It reads Fatu’s history from <code>coffee-orders</code>, asks Bedrock for a suggestion, and saves it to <code>coffee-recommendations</code>.',
+      token:'M905,178 L905,319', nodes:['sns','rec','bedrock','orders','recs'],
+      edges:['e4','e5','e6','e7'], labels:['l-e5','l-e6','l-e7'], poll:true },
+
+    { track:'async', tag:'Poll · GET /recommendation',
+      text:'On one of the browser’s polls, <code>ddb.send(GetCommand)</code> now finds Fatu’s row and returns <code>{ ready:true, recommendation:"…" }</code>.',
+      token:'M150,191 C250,330 460,300 512,180', nodes:['browser','api','recs'],
+      edges:['e9','e8'], labels:['l-e9','l-e8'], poll:true },
+
+    { track:'async', tag:'Recommendation delivered',
+      text:'The poll sees <code>data.ready</code>, writes the sentence into the amber box, and returns. The suggestion is on screen — and the customer never waited. 🎉',
+      token:'M520,521 L520,200 C520,150 320,148 236,138', nodes:['recs','api','browser'],
+      edges:['e8','e3'], labels:[], poll:false, fill:true, timeSync:true, timeAsync:true }
+  ];
+
+  const svgNS='http://www.w3.org/2000/svg';
+  const $=id=>document.getElementById(id);
+  const token=$('token');
+  const dotsWrap=$('dots');
+  let cur=0, playing=false, raf=null, playTimer=null;
+
+  // build dots
+  STEPS.forEach((s,i)=>{
+    const d=document.createElement('button');
+    d.className='dot'; d.textContent=i+1; d.setAttribute('aria-label','Step '+(i+1));
+    d.addEventListener('click',()=>{stopPlay();go(i);});
+    dotsWrap.appendChild(d);
+  });
+
+  function clearHot(){
+    document.querySelectorAll('.edge').forEach(e=>e.classList.remove('hot','sync','async','_keepdash'));
+    document.querySelectorAll('.arrowhead').forEach(a=>a.classList.remove('hot','sync','async'));
+    document.querySelectorAll('.elbl').forEach(l=>l.classList.remove('show'));
+    document.querySelectorAll('.node').forEach(n=>n.classList.remove('active'));
+  }
+
+  function applyState(i){
+    const s=STEPS[i];
+    clearHot();
+    // narration
+    $('stepNum').textContent=i+1;
+    $('nTag').textContent=s.tag;
+    $('nText').innerHTML=s.text;
+    $('narration').classList.toggle('async', s.track==='async');
+    // dots
+    [...dotsWrap.children].forEach((d,k)=>{
+      d.classList.toggle('cur',k===i);
+      d.classList.toggle('done',k<i);
+    });
+    // edges + heads
+    s.edges.forEach(eid=>{
+      const e=$(eid); if(e){e.classList.add('hot',s.track);}
+      const h=document.querySelector('[data-h="'+eid+'"]'); if(h){h.classList.add('hot',s.track);}
+    });
+    // labels
+    (s.labels||[]).forEach(lid=>{const l=$(lid); if(l)l.classList.add('show');});
+    // nodes
+    s.nodes.forEach(nid=>{const n=$('n-'+nid); if(n)n.classList.add('active');});
+    // poll badge (steps 3..5 -> index 2..4 keep on; turns off at final)
+    $('pollBadge').classList.toggle('show', !!s.poll);
+    // timing
+    $('timeSync').classList.toggle('show', i>=2);
+    $('timeAsync').classList.toggle('show', i>=5);
+    // rec box fill
+    const filled = i>=5;
+    $('recBox').classList.toggle('filled', filled);
+    $('recText').classList.toggle('filled', filled);
+    $('recPlaceholder').classList.toggle('hide', filled);
+    // key idea lights up at the end
+    $('keyidea').classList.toggle('lit', i===STEPS.length-1);
+    // buttons
+    $('prevBtn').disabled = i===0;
+    $('nextBtn').disabled = i===STEPS.length-1;
+  }
+
+  function animateToken(i, done){
+    const s=STEPS[i];
+    // temp path to measure
+    const p=document.createElementNS(svgNS,'path');
+    p.setAttribute('d', s.token);
+    p.style.visibility='hidden';
+    token.parentNode.appendChild(p);
+    const len=p.getTotalLength();
+    token.setAttribute('class', s.track==='sync'?'token-sync':'token-async');
+
+    if(reduce){
+      const pt=p.getPointAtLength(len);
+      token.setAttribute('cx',pt.x); token.setAttribute('cy',pt.y);
+      token.setAttribute('opacity','0');
+      p.remove(); if(done) done(); return;
+    }
+
+    token.setAttribute('opacity','1');
+    const dur=1150;
+    let start=null;
+    cancelAnimationFrame(raf);
+    function frame(t){
+      if(start===null) start=t;
+      let k=(t-start)/dur; if(k>1)k=1;
+      const ease = k<0.5 ? 2*k*k : 1-Math.pow(-2*k+2,2)/2; // easeInOutQuad
+      const pt=p.getPointAtLength(ease*len);
+      token.setAttribute('cx',pt.x); token.setAttribute('cy',pt.y);
+      token.setAttribute('opacity', k>0.9 ? (1-(k-0.9)/0.1) : 1);
+      if(k<1){ raf=requestAnimationFrame(frame); }
+      else { token.setAttribute('opacity','0'); p.remove(); if(done) done(); }
+    }
+    raf=requestAnimationFrame(frame);
+  }
+
+  function go(i){
+    cur=Math.max(0,Math.min(STEPS.length-1,i));
+    applyState(cur);
+    animateToken(cur, ()=>{
+      if(playing){
+        if(cur<STEPS.length-1){ playTimer=setTimeout(()=>go(cur+1), 750); }
+        else { stopPlay(); }
+      }
+    });
+  }
+
+  function next(){ if(cur<STEPS.length-1){stopPlay();go(cur+1);} }
+  function prev(){ if(cur>0){stopPlay();go(cur-1);} }
+  function reset(){ stopPlay(); go(0); }
+
+  function startPlay(){
+    playing=true; $('playBtn').innerHTML='❚❚ Pause';
+    if(cur===STEPS.length-1) cur=-1;
+    go(cur+1<STEPS.length?cur+1:0);
+  }
+  function stopPlay(){
+    playing=false; $('playBtn').innerHTML='▶ Play';
+    clearTimeout(playTimer);
+  }
+  function togglePlay(){ playing?stopPlay():startPlay(); }
+
+  $('nextBtn').addEventListener('click',next);
+  $('prevBtn').addEventListener('click',prev);
+  $('resetBtn').addEventListener('click',reset);
+  $('playBtn').addEventListener('click',togglePlay);
+
+  document.addEventListener('keydown',e=>{
+    if(e.key==='ArrowRight'){e.preventDefault();next();}
+    else if(e.key==='ArrowLeft'){e.preventDefault();prev();}
+    else if(e.key===' '){e.preventDefault();togglePlay();}
+    else if(e.key==='r'||e.key==='R'){reset();}
+  });
+
+  // init
+  go(0);
+})();
+</script>
+</body>
+</html>
